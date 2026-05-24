@@ -1,0 +1,47 @@
+name: sistema_accesos_app
+description: Sistema de Gestión de Accesos y Visitas - ITT
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Arquitectura y estado
+  flutter_bloc: ^8.1.3
+  equatable: ^2.0.5
+
+  # Cliente HTTP
+  dio: ^5.3.3
+
+  # Almacenamiento seguro de tokens
+  flutter_secure_storage: ^9.0.0
+
+  # Notificaciones push
+  flutter_local_notifications: ^16.3.0
+
+  # Escaneo QR
+  mobile_scanner: ^3.5.5
+
+  # Generación QR
+  qr_flutter: ^4.1.0
+
+  # Navegación
+  go_router: ^12.1.3
+
+  # Tipografía institucional
+  google_fonts: ^6.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  bloc_test: ^9.1.5
+  mocktail: ^1.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
