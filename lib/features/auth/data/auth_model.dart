@@ -5,8 +5,9 @@
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
 // Versión   : 1.0.0
-// Descripción: Modelo de autenticación — RF-009, RF-010
 // =============================================================================
+
+import 'dart:convert';
 
 class AuthModel {
   final String token;
@@ -59,14 +60,17 @@ class AuthModel {
     };
   }
 
-  factory AuthModel.fromString(String json) {
-    // Parseo simple del string guardado en secure storage
-    final Map<String, dynamic> mapa = {};
-    return AuthModel.fromJson(mapa);
+  factory AuthModel.fromString(String jsonStr) {
+    try {
+      final mapa = jsonDecode(jsonStr) as Map<String, dynamic>;
+      return AuthModel.fromJson(mapa);
+    } catch (e) {
+      throw Exception('Error al parsear sesión guardada: $e');
+    }
   }
 
   @override
   String toString() {
-    return '${toJson()}';
+    return jsonEncode(toJson());
   }
 }

@@ -27,6 +27,7 @@ import '../../../access_control/presentation/dialogs/manual_code_dialog.dart';
 import '../../../access_control/presentation/screens/qr_scanner_screen.dart';
 import '../../../access_control/presentation/screens/visitas_hoy_screen.dart';
 import '../../../access_control/presentation/widgets/qr_result_widget.dart';
+import '../../../notifications/presentation/screens/notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -211,7 +212,12 @@ class _HomeScreenState extends State<HomeScreen> {
             icono: Icons.notifications_outlined,
             titulo: AppStrings.menuNotificaciones,
             color: AppColors.headingSky,
-            onTap: () {},
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NotificationsScreen(),
+              ),
+            ),
           ),
         ];
 

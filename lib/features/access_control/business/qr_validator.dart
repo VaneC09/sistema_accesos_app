@@ -13,7 +13,6 @@ import '../../../core/errors/app_exceptions.dart';
 class QrValidator {
   QrValidator._();
 
-  // Valida que el código QR no esté vacío
   static void validarCodigoQr(String codigo) {
     if (codigo.trim().isEmpty) {
       throw const ValidationException(
@@ -22,28 +21,20 @@ class QrValidator {
     }
   }
 
-  // Valida código numérico de 8 dígitos — RF-022
   static void validarCodigoNumerico(String codigo) {
     if (codigo.trim().isEmpty) {
       throw const ValidationException(
-        mensaje: 'Ingrese el código numérico de 8 dígitos',
+        mensaje: 'Ingrese el código de 8 caracteres',
       );
     }
 
     if (codigo.trim().length != 8) {
       throw const ValidationException(
-        mensaje: 'El código debe tener exactamente 8 dígitos',
-      );
-    }
-
-    if (!RegExp(r'^[0-9]+$').hasMatch(codigo.trim())) {
-      throw const ValidationException(
-        mensaje: 'El código solo debe contener dígitos',
+        mensaje: 'El código debe tener exactamente 8 caracteres',
       );
     }
   }
 
-  // Valida que el teléfono del vigilante esté registrado
   static void validarTelefonoVigilante(String telefono) {
     if (telefono.trim().isEmpty) {
       throw const ValidationException(

@@ -39,10 +39,10 @@ class _ManualCodeDialogState extends State<ManualCodeDialog> {
   }
 
   void _onConfirmar() {
-    final codigo = _codigoController.text.trim();
-    if (codigo.length != 8 || !RegExp(r'^[0-9]+$').hasMatch(codigo)) {
+    final codigo = _codigoController.text.trim().toUpperCase();
+    if (codigo.length != 8) {
       setState(() {
-        _error = 'El código debe tener exactamente 8 dígitos numéricos';
+        _error = 'El código debe tener exactamente 8 caracteres';
       });
       return;
     }
@@ -67,7 +67,7 @@ class _ManualCodeDialogState extends State<ManualCodeDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            'Ingresa el código numérico de 8 dígitos del pase QR',
+            'Ingresa el código alfanumérico de 8 caracteres del pase QR',
             style: TextStyle(
               color: AppColors.onyxGrey,
               fontSize: 14,
@@ -76,18 +76,19 @@ class _ManualCodeDialogState extends State<ManualCodeDialog> {
           const SizedBox(height: AppSpacing.md),
           TextField(
             controller: _codigoController,
-            keyboardType: TextInputType.number,
+            keyboardType: TextInputType.text,
             maxLength: 8,
+            textCapitalization: TextCapitalization.characters,
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w700,
-              letterSpacing: 8,
+              letterSpacing: 4,
               color: AppColors.deepNavy,
             ),
             textAlign: TextAlign.center,
             decoration: InputDecoration(
               counterText: '',
-              hintText: '00000000',
+              hintText: 'AB12CD34',
               errorText: _error,
             ),
             onChanged: (_) {

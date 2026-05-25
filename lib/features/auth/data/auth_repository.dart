@@ -26,7 +26,6 @@ class AuthRepository {
   })  : _datasource = datasource ?? AuthDatasource(),
         _storage = storage ?? const FlutterSecureStorage();
 
-  // Login institucional
   Future<AuthModel> login(String usuario, String contrasena) async {
     try {
       final modelo = await _datasource.login(usuario, contrasena);
@@ -42,7 +41,6 @@ class AuthRepository {
     }
   }
 
-  // Login vigilante
   Future<AuthModel> loginVigilante(String telefono, String area) async {
     try {
       final modelo = await _datasource.loginVigilante(telefono, area);
@@ -58,7 +56,6 @@ class AuthRepository {
     }
   }
 
-  // Cerrar sesión
   Future<void> logout() async {
     try {
       await _datasource.logout('');
@@ -69,7 +66,6 @@ class AuthRepository {
     }
   }
 
-  // Verifica si hay sesión activa
   Future<AuthModel?> obtenerSesionActiva() async {
     try {
       final token = await _storage.read(key: AppConfig.claveToken);
@@ -85,7 +81,6 @@ class AuthRepository {
     }
   }
 
-  // Guarda sesión en almacenamiento seguro
   Future<void> _guardarSesion(AuthModel modelo) async {
     await _storage.write(
       key: AppConfig.claveToken,
@@ -99,10 +94,9 @@ class AuthRepository {
       key: AppConfig.claveRol,
       value: modelo.rol,
     );
-    AppLogger.info(_modulo, 'Sesión guardada en almacenamiento seguro');
+    AppLogger.info(_modulo, 'Sesión guardada — rol: ${modelo.rol}');
   }
 
-  // Limpia sesión del almacenamiento seguro
   Future<void> _limpiarSesion() async {
     await _storage.delete(key: AppConfig.claveToken);
     await _storage.delete(key: AppConfig.claveRefreshToken);

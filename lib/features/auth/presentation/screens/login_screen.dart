@@ -54,9 +54,10 @@ class _LoginScreenState extends State<LoginScreen> {
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {
-            Navigator.pushReplacement(
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (_) => HomeScreen()),
+                  (route) => false,
             );
           } else if (state is AuthBlocked) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -75,7 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Encabezado
                   AuthHeaderWidget(
                     icono: Icons.lock_outline_rounded,
                     titulo: AppStrings.tituloApp,
@@ -83,7 +83,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
-                  // Campo usuario
                   TextField(
                     controller: _usuarioController,
                     keyboardType: TextInputType.emailAddress,
@@ -95,7 +94,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
 
-                  // Campo contraseña
                   TextField(
                     controller: _contrasenaController,
                     obscureText: _obscurePassword,
@@ -118,7 +116,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xl),
 
-                  // Botón iniciar sesión
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
                       return PrimaryButtonWidget(
@@ -130,7 +127,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
 
-                  // Botón vigilante
                   TextButton.icon(
                     onPressed: () {
                       Navigator.push(
@@ -151,7 +147,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
 
-                  // Mensaje de error
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
                       if (state is AuthError) {

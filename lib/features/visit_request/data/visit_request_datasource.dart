@@ -5,133 +5,129 @@
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
 // Versión   : 1.0.0
-// Descripción: Fuente de datos de solicitudes de visita — RF-013, RF-014
 // =============================================================================
 
-import '../../../core/connection/api_client.dart';
 import '../../../core/errors/app_logger.dart';
 import 'visit_request_model.dart';
 
 class VisitRequestDatasource {
-  final ApiClient _apiClient;
   static const String _modulo = 'VISIT_REQUEST_DATASOURCE';
 
-  VisitRequestDatasource({ApiClient? apiClient})
-      : _apiClient = apiClient ?? ApiClient.instancia;
-
-  // Crear solicitud de visita
-  Future<VisitRequestModel> crearSolicitud(
-      VisitRequestModel solicitud,
-      ) async {
-    AppLogger.info(_modulo, 'Creando solicitud de visita');
-
-    final respuesta = await _apiClient.post(
-      '/solicitudes',
-      datos: solicitud.toJson(),
-    );
-
-    AppLogger.info(_modulo, 'Solicitud creada exitosamente');
-    return VisitRequestModel.fromJson(
-      respuesta.data as Map<String, dynamic>,
+  Future<VisitRequestModel> crearSolicitud(VisitRequestModel solicitud) async {
+    AppLogger.info(_modulo, 'Creando solicitud mock');
+    await Future.delayed(const Duration(milliseconds: 500));
+    return VisitRequestModel(
+      idSolicitud: 1,
+      tipoVisita: solicitud.tipoVisita,
+      esGrupal: solicitud.esGrupal,
+      visitantes: solicitud.visitantes,
+      lugarDestino: solicitud.lugarDestino,
+      fechaVisita: solicitud.fechaVisita,
+      motivoVisita: solicitud.motivoVisita,
+      toleranciaAntesMinutos: solicitud.toleranciaAntesMinutos,
+      toleranciaDespuesMinutos: solicitud.toleranciaDespuesMinutos,
+      estado: 'Pendiente',
+      folio: 'VIS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
     );
   }
 
-  // Obtener mis solicitudes
   Future<List<VisitRequestModel>> obtenerMisSolicitudes({
     String? estado,
     DateTime? fechaInicio,
     DateTime? fechaFin,
   }) async {
-    AppLogger.info(_modulo, 'Obteniendo mis solicitudes');
-
-    final parametros = <String, dynamic>{};
-    if (estado != null) parametros['estado'] = estado;
-    if (fechaInicio != null) {
-      parametros['fecha_inicio'] = fechaInicio.toIso8601String();
-    }
-    if (fechaFin != null) {
-      parametros['fecha_fin'] = fechaFin.toIso8601String();
-    }
-
-    final respuesta = await _apiClient.get(
-      '/solicitudes/mis-solicitudes',
-      parametros: parametros,
-    );
-
-    final lista = respuesta.data as List<dynamic>? ?? [];
-    return lista
-        .map((s) => VisitRequestModel.fromJson(s as Map<String, dynamic>))
-        .toList();
+    AppLogger.info(_modulo, 'Obteniendo solicitudes mock');
+    await Future.delayed(const Duration(milliseconds: 500));
+    return [
+      VisitRequestModel(
+        idSolicitud: 1,
+        tipoVisita: 'Personal',
+        esGrupal: false,
+        visitantes: [
+          VisitanteModel(nombre: 'Juan Pérez', correo: 'juan@gmail.com'),
+        ],
+        lugarDestino: 'Edificio T',
+        fechaVisita: DateTime.now().add(const Duration(days: 1)),
+        motivoVisita: 'Reunión de trabajo',
+        toleranciaAntesMinutos: 15,
+        toleranciaDespuesMinutos: 15,
+        estado: 'Pendiente',
+        folio: 'VIS-001',
+      ),
+      VisitRequestModel(
+        idSolicitud: 2,
+        tipoVisita: 'Proveedor',
+        esGrupal: false,
+        visitantes: [
+          VisitanteModel(nombre: 'María López', correo: 'maria@empresa.com'),
+        ],
+        lugarDestino: 'Recursos Materiales',
+        fechaVisita: DateTime.now().add(const Duration(days: 2)),
+        motivoVisita: 'Entrega de material',
+        toleranciaAntesMinutos: 15,
+        toleranciaDespuesMinutos: 15,
+        estado: 'Autorizada',
+        folio: 'VIS-002',
+      ),
+    ];
   }
 
-  // Obtener detalle de solicitud
   Future<VisitRequestModel> obtenerDetalle(int idSolicitud) async {
-    AppLogger.info(_modulo, 'Obteniendo detalle solicitud: $idSolicitud');
-
-    final respuesta = await _apiClient.get('/solicitudes/$idSolicitud');
-
-    return VisitRequestModel.fromJson(
-      respuesta.data as Map<String, dynamic>,
+    await Future.delayed(const Duration(milliseconds: 300));
+    return VisitRequestModel(
+      idSolicitud: idSolicitud,
+      tipoVisita: 'Personal',
+      esGrupal: false,
+      visitantes: [
+        VisitanteModel(nombre: 'Juan Pérez', correo: 'juan@gmail.com'),
+      ],
+      lugarDestino: 'Edificio T',
+      fechaVisita: DateTime.now().add(const Duration(days: 1)),
+      motivoVisita: 'Reunión de trabajo',
+      toleranciaAntesMinutos: 15,
+      toleranciaDespuesMinutos: 15,
+      estado: 'Pendiente',
+      folio: 'VIS-00$idSolicitud',
     );
   }
 
-  // Cancelar solicitud
   Future<void> cancelarSolicitud(int idSolicitud) async {
-    AppLogger.info(_modulo, 'Cancelando solicitud: $idSolicitud');
-
-    await _apiClient.post('/solicitudes/$idSolicitud/cancelar');
-
-    AppLogger.info(_modulo, 'Solicitud cancelada: $idSolicitud');
+    AppLogger.info(_modulo, 'Cancelando solicitud mock: $idSolicitud');
+    await Future.delayed(const Duration(milliseconds: 300));
   }
 
-  // Obtener catálogo de tipos de visita
   Future<List<CatalogoModel>> obtenerTiposVisita() async {
-    AppLogger.info(_modulo, 'Obteniendo tipos de visita');
-
-    final respuesta = await _apiClient.get('/catalogos/tipos-visita');
-
-    final lista = respuesta.data as List<dynamic>? ?? [];
-    return lista
-        .map((t) => CatalogoModel.fromJson(t as Map<String, dynamic>))
-        .toList();
+    await Future.delayed(const Duration(milliseconds: 300));
+    return [
+      const CatalogoModel(id: 1, nombre: 'Personal'),
+      const CatalogoModel(id: 2, nombre: 'Proveedor'),
+      const CatalogoModel(id: 3, nombre: 'Consulta'),
+    ];
   }
 
-  // Obtener catálogo de departamentos
   Future<List<CatalogoModel>> obtenerDepartamentos() async {
-    AppLogger.info(_modulo, 'Obteniendo departamentos');
-
-    final respuesta = await _apiClient.get('/catalogos/departamentos');
-
-    final lista = respuesta.data as List<dynamic>? ?? [];
-    return lista
-        .map((d) => CatalogoModel.fromJson(d as Map<String, dynamic>))
-        .toList();
+    await Future.delayed(const Duration(milliseconds: 300));
+    return [
+      const CatalogoModel(id: 1, nombre: 'Sistemas y Computación'),
+      const CatalogoModel(id: 2, nombre: 'Recursos Materiales'),
+      const CatalogoModel(id: 3, nombre: 'Desarrollo Académico'),
+      const CatalogoModel(id: 4, nombre: 'Comunicación y Difusión'),
+      const CatalogoModel(id: 5, nombre: 'Alberca'),
+    ];
   }
 
-  // Enviar QR al visitante
   Future<void> enviarQr(int idSolicitud) async {
-    AppLogger.info(_modulo, 'Enviando QR solicitud: $idSolicitud');
-
-    await _apiClient.post('/solicitudes/$idSolicitud/enviar-qr');
-
-    AppLogger.info(_modulo, 'QR enviado: $idSolicitud');
+    AppLogger.info(_modulo, 'Enviando QR mock: $idSolicitud');
+    await Future.delayed(const Duration(milliseconds: 300));
   }
 
-  // Reenviar QR
   Future<void> reenviarQr(int idSolicitud) async {
-    AppLogger.info(_modulo, 'Reenviando QR solicitud: $idSolicitud');
-
-    await _apiClient.post('/solicitudes/$idSolicitud/reenviar-qr');
-
-    AppLogger.info(_modulo, 'QR reenviado: $idSolicitud');
+    AppLogger.info(_modulo, 'Reenviando QR mock: $idSolicitud');
+    await Future.delayed(const Duration(milliseconds: 300));
   }
 
-  // Extender vigencia del QR
   Future<void> extenderQr(int idSolicitud) async {
-    AppLogger.info(_modulo, 'Extendiendo QR solicitud: $idSolicitud');
-
-    await _apiClient.post('/solicitudes/$idSolicitud/extender-qr');
-
-    AppLogger.info(_modulo, 'QR extendido: $idSolicitud');
+    AppLogger.info(_modulo, 'Extendiendo QR mock: $idSolicitud');
+    await Future.delayed(const Duration(milliseconds: 300));
   }
 }
