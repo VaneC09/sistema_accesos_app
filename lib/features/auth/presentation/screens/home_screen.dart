@@ -11,15 +11,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../bloc/auth_bloc.dart';
+import '../../data/auth_repository.dart';
 import '../../presentation/dialogs/logout_dialog.dart';
+import '../../presentation/screens/login_screen.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/widgets/loading_widget.dart';
 import '../../../../core/widgets/nueva_solicitud_wrapper.dart';
 import '../../../visit_request/presentation/screens/mis_solicitudes_screen.dart';
 import '../../../visit_authorization/presentation/screens/autorizaciones_screen.dart';
+import '../../../access_control/bloc/access_control_bloc.dart';
+import '../../../access_control/data/access_repository.dart';
+import '../../../access_control/presentation/dialogs/manual_code_dialog.dart';
 import '../../../access_control/presentation/screens/qr_scanner_screen.dart';
 import '../../../access_control/presentation/screens/visitas_hoy_screen.dart';
+import '../../../access_control/presentation/widgets/qr_result_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -82,7 +89,6 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Chip de rol
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
@@ -237,12 +243,33 @@ class _HomeScreenState extends State<HomeScreen> {
             icono: Icons.edit_note_rounded,
             titulo: AppStrings.menuRegistroManual,
             color: AppColors.headingSky,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const QrScannerScreen(),
-              ),
-            ),
+            onTap: () async {
+              final authState = context.read<AuthBloc>().state;
+              String telefono = '';
+              String area = '';
+              if (authState is AuthAuthenticated) {
+                telefono = authState.nombre;
+                area = authState.nombre;
+              }
+              final codigo = await ManualCodeDialog.mostrar(context);
+              if (codigo != null && context.mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => BlocProvider(
+                      create: (_) => AccessControlBloc(
+                        repository: AccessRepository(),
+                      ),
+                      child: _RegistroManualScreen(
+                        codigo: codigo,
+                        telefono: telefono,
+                        area: area,
+                      ),
+                    ),
+                  ),
+                );
+              }
+            },
           ),
         ];
 
@@ -259,8 +286,31 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _LoginRedirect extends StatelessWidget {
+// ── Login Redirect ────────────────────────────────────────────────────────────
+class _LoginRedirect extends StatefulWidget {
   const _LoginRedirect();
+
+  @override
+  State<_LoginRedirect> createState() => _LoginRedirectState();
+}
+
+class _LoginRedirectState extends State<_LoginRedirect> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => AuthBloc(repository: AuthRepository()),
+            child: const LoginScreen(),
+          ),
+        ),
+            (route) => false,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -274,6 +324,106 @@ class _LoginRedirect extends StatelessWidget {
   }
 }
 
+// ── Registro Manual Screen ────────────────────────────────────────────────────
+class _RegistroManualScreen extends StatefulWidget {
+  final String codigo;
+  final String telefono;
+  final String area;
+
+  const _RegistroManualScreen({
+    required this.codigo,
+    required this.telefono,
+    required this.area,
+  });
+
+  @override
+  State<_RegistroManualScreen> createState() => _RegistroManualScreenState();
+}
+
+class _RegistroManualScreenState extends State<_RegistroManualScreen> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<AccessControlBloc>().add(
+      RegistroManual(
+        codigoNumerico: widget.codigo,
+        telefono: widget.telefono,
+        area: widget.area,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.baseSurface,
+      appBar: AppBar(
+        backgroundColor: AppColors.primaryCoral,
+        title: const Text(
+          'Registro manual',
+          style: TextStyle(color: AppColors.baseSurface),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: AppColors.baseSurface,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: BlocBuilder<AccessControlBloc, AccessControlState>(
+        builder: (context, state) {
+          if (state is AccessControlLoading) {
+            return const LoadingWidget(mensaje: 'Validando código...');
+          }
+          if (state is QrEscaneadoSuccess) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.paddingPantalla),
+              child: QrResultWidget(
+                resultado: state.resultado,
+                onNuevoEscaneo: () => Navigator.pop(context),
+              ),
+            );
+          }
+          if (state is AccessControlError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.paddingPantalla),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      color: AppColors.actionRed,
+                      size: 72,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      state.mensaje,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: AppColors.actionRed,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Volver'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          return const LoadingWidget(mensaje: 'Procesando...');
+        },
+      ),
+    );
+  }
+}
+
+// ── Menu Card ─────────────────────────────────────────────────────────────────
 class _MenuCard extends StatelessWidget {
   final IconData icono;
   final String titulo;
