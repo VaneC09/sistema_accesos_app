@@ -16,6 +16,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/nueva_solicitud_wrapper.dart';
+import '../../../visit_request/presentation/screens/mis_solicitudes_screen.dart';
+import '../../../visit_authorization/presentation/screens/autorizaciones_screen.dart';
+import '../../../access_control/presentation/screens/qr_scanner_screen.dart';
+import '../../../access_control/presentation/screens/visitas_hoy_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,13 +31,26 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
-      builder: (context, state) {
-        if (state is AuthAuthenticated) {
-          return _buildHome(context, state);
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthUnauthenticated) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const _LoginRedirect(),
+            ),
+                (route) => false,
+          );
         }
-        return const SizedBox.shrink();
       },
+      child: BlocBuilder<AuthBloc, AuthState>(
+        builder: (context, state) {
+          if (state is AuthAuthenticated) {
+            return _buildHome(context, state);
+          }
+          return const SizedBox.shrink();
+        },
+      ),
     );
   }
 
@@ -128,15 +145,22 @@ class _HomeScreenState extends State<HomeScreen> {
             icono: Icons.add_circle_outline_rounded,
             titulo: AppStrings.menuNuevaSolicitud,
             color: AppColors.primaryCoral,
-            onTap: () => _navegarNuevaSolicitud(context),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => NuevaSolicitudWrapper(),
+              ),
+            ),
           ),
           _MenuCard(
             icono: Icons.list_alt_rounded,
             titulo: AppStrings.menuMisSolicitudes,
             color: AppColors.headingDark,
-            onTap: () => _navegarPlaceholder(
+            onTap: () => Navigator.push(
               context,
-              AppStrings.menuMisSolicitudes,
+              MaterialPageRoute(
+                builder: (_) => const MisSolicitudesScreen(),
+              ),
             ),
           ),
         ];
@@ -148,24 +172,33 @@ class _HomeScreenState extends State<HomeScreen> {
             icono: Icons.add_circle_outline_rounded,
             titulo: AppStrings.menuNuevaSolicitud,
             color: AppColors.primaryCoral,
-            onTap: () => _navegarNuevaSolicitud(context),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => NuevaSolicitudWrapper(),
+              ),
+            ),
           ),
           _MenuCard(
             icono: Icons.list_alt_rounded,
             titulo: AppStrings.menuMisSolicitudes,
             color: AppColors.headingDark,
-            onTap: () => _navegarPlaceholder(
+            onTap: () => Navigator.push(
               context,
-              AppStrings.menuMisSolicitudes,
+              MaterialPageRoute(
+                builder: (_) => const MisSolicitudesScreen(),
+              ),
             ),
           ),
           _MenuCard(
             icono: Icons.pending_actions_rounded,
             titulo: AppStrings.menuAutorizarVisitas,
             color: AppColors.successGreen,
-            onTap: () => _navegarPlaceholder(
+            onTap: () => Navigator.push(
               context,
-              AppStrings.menuAutorizarVisitas,
+              MaterialPageRoute(
+                builder: (_) => const AutorizacionesScreen(),
+              ),
             ),
           ),
           _MenuCard(
@@ -182,27 +215,33 @@ class _HomeScreenState extends State<HomeScreen> {
             icono: Icons.qr_code_scanner_rounded,
             titulo: AppStrings.menuEscanearQr,
             color: AppColors.primaryCoral,
-            onTap: () => _navegarPlaceholder(
+            onTap: () => Navigator.push(
               context,
-              AppStrings.menuEscanearQr,
+              MaterialPageRoute(
+                builder: (_) => const QrScannerScreen(),
+              ),
             ),
           ),
           _MenuCard(
             icono: Icons.list_alt_rounded,
             titulo: AppStrings.menuVisitasHoy,
             color: AppColors.headingDark,
-            onTap: () => _navegarPlaceholder(
+            onTap: () => Navigator.push(
               context,
-              AppStrings.menuVisitasHoy,
+              MaterialPageRoute(
+                builder: (_) => const VisitasHoyScreen(),
+              ),
             ),
           ),
           _MenuCard(
             icono: Icons.edit_note_rounded,
             titulo: AppStrings.menuRegistroManual,
             color: AppColors.headingSky,
-            onTap: () => _navegarPlaceholder(
+            onTap: () => Navigator.push(
               context,
-              AppStrings.menuRegistroManual,
+              MaterialPageRoute(
+                builder: (_) => const QrScannerScreen(),
+              ),
             ),
           ),
         ];
@@ -212,64 +251,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _navegarNuevaSolicitud(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => NuevaSolicitudWrapper(),
-      ),
-    );
-  }
-
-  void _navegarPlaceholder(BuildContext context, String titulo) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _PantallaPlaceholder(titulo: titulo),
-      ),
-    );
-  }
-
   Future<void> _onLogoutPressed(BuildContext context) async {
     final confirmar = await LogoutDialog.mostrar(context);
     if (confirmar == true && context.mounted) {
       context.read<AuthBloc>().add(LogoutRequested());
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const _PantallaPlaceholder(titulo: 'Login'),
-        ),
-            (route) => false,
-      );
     }
   }
 }
 
-class _PantallaPlaceholder extends StatelessWidget {
-  final String titulo;
-
-  const _PantallaPlaceholder({required this.titulo});
+class _LoginRedirect extends StatelessWidget {
+  const _LoginRedirect();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.baseSurface,
-      appBar: AppBar(
-        backgroundColor: AppColors.primaryCoral,
-        title: Text(
-          titulo,
-          style: const TextStyle(color: AppColors.baseSurface),
-        ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.baseSurface,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+    return const Scaffold(
       body: Center(
-        child: Text('$titulo — ${AppStrings.labelEnConstruccion}'),
+        child: CircularProgressIndicator(
+          color: AppColors.primaryCoral,
+        ),
       ),
     );
   }

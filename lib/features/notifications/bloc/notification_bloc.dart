@@ -1,0 +1,113 @@
+// =============================================================================
+// Proyecto  : Sistema de Gestión de Accesos y Visitas
+// Archivo   : notification_bloc.dart
+// Módulo    : features/notifications/bloc
+// Autor     : Omega Company
+// Fecha     : 2026-05-23
+// Versión   : 1.0.0
+// Descripción: Gestor de estado de notificaciones — RF-023
+// =============================================================================
+
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:equatable/equatable.dart';
+import '../data/notification_model.dart';
+import '../../../core/errors/app_logger.dart';
+
+// ── Eventos ──────────────────────────────────────────────────────────────────
+abstract class NotificationEvent extends Equatable {
+  const NotificationEvent();
+
+  @override
+  List<Object?> get props => [];
+}
+
+class NotificacionRecibida extends NotificationEvent {
+  final NotificationModel notificacion;
+
+  const NotificacionRecibida({required this.notificacion});
+
+  @override
+  List<Object?> get props => [notificacion];
+}
+
+class MarcarComoLeida extends NotificationEvent {
+  final String idNotificacion;
+
+  const MarcarComoLeida({required this.idNotificacion});
+
+  @override
+  List<Object?> get props => [idNotificacion];
+}
+
+class LimpiarNotificaciones extends NotificationEvent {}
+
+// ── Estados ──────────────────────────────────────────────────────────────────
+abstract class NotificationState extends Equatable {
+  const NotificationState();
+
+  @override
+  List<Object?> get props => [];
+}
+
+class NotificationInitial extends NotificationState {}
+
+class NotificacionesLoaded extends NotificationState {
+  final List<NotificationModel> notificaciones;
+  final int noLeidas;
+
+  const NotificacionesLoaded({
+    required this.notificaciones,
+    required this.noLeidas,
+  });
+
+  @override
+  List<Object?> get props => [notificaciones, noLeidas];
+}
+
+// ── Bloc ─────────────────────────────────────────────────────────────────────
+class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
+  static const String _modulo = 'NOTIFICATION_BLOC';
+  final List<NotificationModel> _notificaciones = [];
+
+  NotificationBloc() : super(NotificationInitial()) {
+    on<NotificacionRecibida>(_onNotificacionRecibida);
+    on<MarcarComoLeida>(_onMarcarComoLeida);
+    on<LimpiarNotificaciones>(_onLimpiar);
+  }
+
+  void _onNotificacionRecibida(
+      NotificacionRecibida event,
+      Emitter<NotificationState> emit,
+      ) {
+    AppLogger.info(_modulo, 'Nueva notificación: ${event.notificacion.tipo}');
+    _notificaciones.insert(0, event.notificacion);
+    emit(NotificacionesLoaded(
+      notificaciones: List.from(_notificaciones),
+      noLeidas: _notificaciones.where((n) => !n.leida).length,
+    ));
+  }
+
+  void _onMarcarComoLeida(
+      MarcarComoLeida event,
+      Emitter<NotificationState> emit,
+      ) {
+    final index = _notificaciones.indexWhere(
+          (n) => n.id == event.idNotificacion,
+    );
+    if (index != -1) {
+      _notificaciones[index] = _notificaciones[index].copyWith(leida: true);
+      emit(NotificacionesLoaded(
+        notificaciones: List.from(_notificaciones),
+        noLeidas: _notificaciones.where((n) => !n.leida).length,
+      ));
+    }
+  }
+
+  void _onLimpiar(
+      LimpiarNotificaciones event,
+      Emitter<NotificationState> emit,
+      ) {
+    _notificaciones.clear();
+    emit(NotificationInitial());
+  }
+}

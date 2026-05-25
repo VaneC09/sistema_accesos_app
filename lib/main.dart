@@ -15,10 +15,13 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/notifications/bloc/notification_bloc.dart';
+import 'features/notifications/data/notification_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   ApiClient.instancia.inicializar();
+  await NotificationService.instancia.inicializar();
   runApp(const SistemaAccesosApp());
 }
 
@@ -27,10 +30,17 @@ class SistemaAccesosApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => AuthBloc(
-        repository: AuthRepository(),
-      )..add(VerificarSesion()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => AuthBloc(
+            repository: AuthRepository(),
+          )..add(VerificarSesion()),
+        ),
+        BlocProvider(
+          create: (_) => NotificationBloc(),
+        ),
+      ],
       child: MaterialApp(
         title: 'Sistema de Accesos ITT',
         theme: AppTheme.lightTheme,

@@ -8,55 +8,83 @@
 // Descripción: Fuente de datos de autenticación — RF-009, RF-010
 // =============================================================================
 
-import '../../../core/connection/api_client.dart';
 import '../../../core/errors/app_logger.dart';
 import 'auth_model.dart';
 
 class AuthDatasource {
-  final ApiClient _apiClient;
   static const String _modulo = 'AUTH_DATASOURCE';
 
-  AuthDatasource({ApiClient? apiClient})
-      : _apiClient = apiClient ?? ApiClient.instancia;
-
-  // Login institucional contra SAM vía Laravel
+  // Login institucional — Mock temporal hasta conectar API Laravel
   Future<AuthModel> login(String usuario, String contrasena) async {
-    AppLogger.info(_modulo, 'Intentando login: $usuario');
+    AppLogger.info(_modulo, 'Login mock: $usuario');
 
-    final respuesta = await _apiClient.post(
-      '/auth/login',
-      datos: {
-        'usuario': usuario,
-        'password': contrasena,
-      },
-    );
+    await Future.delayed(const Duration(seconds: 1));
 
-    AppLogger.info(_modulo, 'Login exitoso: $usuario');
-    return AuthModel.fromJson(respuesta.data);
+    if (contrasena != '1234') {
+      throw Exception('Credenciales inválidas');
+    }
+
+    if (usuario.startsWith('jefe')) {
+      return AuthModel(
+        token: 'mock_token_jefe_123',
+        usuario: usuario,
+        rol: 'jefe',
+        nombre: 'Jefe de Área',
+        correoPersonal: usuario,
+        correoPuesto: 'sc@toluca.tecnm.mx',
+        idEmpleado: 2,
+        idDepartamento: 1,
+        puesto: 'Jefe de Departamento',
+      );
+    } else if (usuario.startsWith('recursos')) {
+      return AuthModel(
+        token: 'mock_token_recursos_123',
+        usuario: usuario,
+        rol: 'recursos_materiales',
+        nombre: 'Recursos Materiales',
+        correoPersonal: usuario,
+        correoPuesto: 'rm@toluca.tecnm.mx',
+        idEmpleado: 3,
+        idDepartamento: 5,
+        puesto: 'Encargado',
+      );
+    } else {
+      return AuthModel(
+        token: 'mock_token_empleado_123',
+        usuario: usuario,
+        rol: 'empleado',
+        nombre: 'Empleado ITT',
+        correoPersonal: usuario,
+        correoPuesto: '',
+        idEmpleado: 1,
+        idDepartamento: 2,
+        puesto: 'Docente',
+      );
+    }
   }
 
-  // Login de vigilante
+  // Login vigilante — Mock temporal
   Future<AuthModel> loginVigilante(String telefono, String area) async {
-    AppLogger.info(_modulo, 'Login vigilante — área: $area');
+    AppLogger.info(_modulo, 'Login vigilante mock — área: $area');
 
-    final respuesta = await _apiClient.post(
-      '/vigilante/login',
-      datos: {
-        'telefono': telefono,
-        'area': area,
-      },
+    await Future.delayed(const Duration(seconds: 1));
+
+    return AuthModel(
+      token: 'mock_token_vigilante_123',
+      usuario: telefono,
+      rol: 'vigilante',
+      nombre: 'Vigilante $area',
+      correoPersonal: '',
+      correoPuesto: '',
+      idEmpleado: 0,
+      idDepartamento: 0,
+      puesto: 'Vigilante',
     );
-
-    AppLogger.info(_modulo, 'Login vigilante exitoso');
-    return AuthModel.fromJson(respuesta.data);
   }
 
-  // Cerrar sesión — invalida token en backend
+  // Cerrar sesión
   Future<void> logout(String token) async {
-    AppLogger.info(_modulo, 'Cerrando sesión en backend');
-
-    await _apiClient.post('/auth/logout');
-
-    AppLogger.info(_modulo, 'Sesión cerrada en backend');
+    AppLogger.info(_modulo, 'Logout mock');
+    await Future.delayed(const Duration(milliseconds: 500));
   }
 }
