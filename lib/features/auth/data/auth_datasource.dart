@@ -22,7 +22,7 @@ class AuthDatasource {
   Future<AuthModel> login(String usuario, String contrasena) async {
     AppLogger.info(_modulo, 'Intentando login: $usuario');
     final respuesta = await _apiClient.post(
-      '/auth/login',
+      '/login',
       datos: { 'usuario': usuario, 'password': contrasena },
     );
     AppLogger.info(_modulo, 'Login exitoso: $usuario');
@@ -40,6 +40,6 @@ class AuthDatasource {
 
   Future<void> logout(String token) async {
     AppLogger.info(_modulo, 'Cerrando sesion en backend');
-    await _apiClient.post('/auth/logout');
+    await _apiClient.post('/logout');
   }
 }

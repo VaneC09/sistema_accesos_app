@@ -26,7 +26,7 @@ class AccessDatasource {
   }) async {
     AppLogger.info(_modulo, 'Escaneando QR');
     final respuesta = await _apiClient.post(
-      '/acceso/escanear',
+      '/vigilante/escanear',
       datos: { 'codigo_qr': codigoQr, 'telefono': telefono, 'area': area },
     );
     return QrScanResultModel.fromJson(respuesta.data as Map<String, dynamic>);
@@ -50,7 +50,7 @@ class AccessDatasource {
   }) async {
     AppLogger.info(_modulo, 'Obteniendo visitas del dia');
     final respuesta = await _apiClient.get(
-      '/visitas/hoy',
+      '/vigilante/visitas-hoy',
       parametros: {'telefono': telefono},
     );
     final lista = respuesta.data as List<dynamic>? ?? [];

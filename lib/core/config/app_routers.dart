@@ -18,7 +18,7 @@ class AppRoutes {
 
   // ── Solicitudes ───────────────────────────────────────────────────────────
   static const String nuevaSolicitud = '/solicitudes/nueva';
-  static const String misSolicitudes = '/solicitudes/mis-solicitudes';
+  static const String misSolicitudes = '/solicitudes';
   static const String detalleSolicitud = '/solicitudes/detalle';
 
   // ── Autorización ──────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ class AppRoutes {
   // ── QR ────────────────────────────────────────────────────────────────────
   static const String detalleQr = '/qr/detalle';
 
-  // ── Control de acceso (vigilante) ─────────────────────────────────────────
+  // ── Control Fde acceso (vigilante) ─────────────────────────────────────────
   static const String escaner = '/acceso/escaner';
   static const String visitasHoy = '/acceso/visitas-hoy';
 

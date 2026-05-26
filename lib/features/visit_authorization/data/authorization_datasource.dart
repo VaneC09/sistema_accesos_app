@@ -21,7 +21,7 @@ class AuthorizationDatasource {
 
   Future<List<AuthorizationModel>> obtenerPendientes() async {
     AppLogger.info(_modulo, 'Obteniendo solicitudes pendientes');
-    final respuesta = await _apiClient.get('/solicitudes/pendientes');
+    final respuesta = await _apiClient.get('/autorizador/solicitudes');
     final lista = respuesta.data as List<dynamic>? ?? [];
     return lista.map((s) => AuthorizationModel.fromJson(s as Map<String, dynamic>)).toList();
   }
@@ -33,13 +33,13 @@ class AuthorizationDatasource {
 
   Future<void> autorizar(int idSolicitud) async {
     AppLogger.info(_modulo, 'Autorizando solicitud: $idSolicitud');
-    await _apiClient.post('/solicitudes/$idSolicitud/autorizar');
+    await _apiClient.post('/autorizador/$idSolicitud/autorizar');
   }
 
   Future<void> rechazar(int idSolicitud, String motivo) async {
     AppLogger.info(_modulo, 'Rechazando solicitud: $idSolicitud');
     await _apiClient.post(
-      '/solicitudes/$idSolicitud/rechazar',
+      '/autorizador/$idSolicitud/rechazar',
       datos: {'motivo': motivo},
     );
   }
