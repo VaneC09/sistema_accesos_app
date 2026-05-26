@@ -12,12 +12,12 @@ class AppConfig {
   AppConfig._();
 
   // ── Entorno ───────────────────────────────────────────────────────────────
-  static const bool esProduccion = false; // ← true para producción
+  static const bool esProduccion = true; // ← true para producción
 
   // ── URL base de la API Laravel ────────────────────────────────────────────
   // DEV: cambia a la IP de tu servidor Laravel local
   static const String baseUrlDev = 'http://10.0.2.2:8000/api';
-  static const String baseUrlProd = 'https://accesos.toluca.tecnm.mx/api';
+  static const String baseUrlProd = 'https://decade-trapdoor-wafer.ngrok-free.dev/api';
 
   static String get baseUrl => esProduccion ? baseUrlProd : baseUrlDev;
 

@@ -8,29 +8,28 @@
 // Descripción: Fuente de datos mock de control de acceso — RF-022, RF-025
 // =============================================================================
 
+import '../../../core/connection/api_client.dart';
 import '../../../core/errors/app_logger.dart';
 import 'access_model.dart';
 
 class AccessDatasource {
+  final ApiClient _apiClient;
   static const String _modulo = 'ACCESS_DATASOURCE';
+
+  AccessDatasource({ApiClient? apiClient})
+      : _apiClient = apiClient ?? ApiClient.instancia;
 
   Future<QrScanResultModel> escanearQr({
     required String codigoQr,
     required String telefono,
     required String area,
   }) async {
-    AppLogger.info(_modulo, 'Escaneando QR mock');
-    await Future.delayed(const Duration(milliseconds: 500));
-    return QrScanResultModel(
-      folio: 'VIS-001',
-      nombreVisitante: 'Juan Pérez',
-      lugarDestino: 'Edificio T - Oficina 301',
-      estado: 'Autorizada',
-      tipoAcceso: 'entrada',
-      accesoConcedido: true,
-      llegaTarde: false,
-      llegaAnticiapdo: false,
+    AppLogger.info(_modulo, 'Escaneando QR');
+    final respuesta = await _apiClient.post(
+      '/acceso/escanear',
+      datos: { 'codigo_qr': codigoQr, 'telefono': telefono, 'area': area },
     );
+    return QrScanResultModel.fromJson(respuesta.data as Map<String, dynamic>);
   }
 
   Future<QrScanResultModel> registroManual({
@@ -38,56 +37,23 @@ class AccessDatasource {
     required String telefono,
     required String area,
   }) async {
-    AppLogger.info(_modulo, 'Registro manual mock: $codigoNumerico');
-    await Future.delayed(const Duration(milliseconds: 500));
-    return QrScanResultModel(
-      folio: 'VIS-002',
-      nombreVisitante: 'María López',
-      lugarDestino: 'Recursos Materiales',
-      estado: 'Autorizada',
-      tipoAcceso: 'entrada',
-      accesoConcedido: true,
-      llegaTarde: false,
-      llegaAnticiapdo: false,
+    AppLogger.info(_modulo, 'Registro manual: $codigoNumerico');
+    final respuesta = await _apiClient.post(
+      '/acceso/manual',
+      datos: { 'codigo_numerico': codigoNumerico, 'telefono': telefono, 'area': area },
     );
+    return QrScanResultModel.fromJson(respuesta.data as Map<String, dynamic>);
   }
 
   Future<List<VisitaHoyModel>> obtenerVisitasHoy({
     required String telefono,
   }) async {
-    AppLogger.info(_modulo, 'Obteniendo visitas del día mock');
-    await Future.delayed(const Duration(milliseconds: 500));
-    return [
-      VisitaHoyModel(
-        folio: 'VIS-001',
-        nombreVisitante: 'Juan Pérez',
-        lugarDestino: 'Edificio T - Oficina 301',
-        tipoVisita: 'Personal',
-        horaVisita: DateTime.now().add(const Duration(hours: 1)),
-        estado: 'Autorizada',
-        entradaRegistrada: false,
-        salidaRegistrada: false,
-      ),
-      VisitaHoyModel(
-        folio: 'VIS-002',
-        nombreVisitante: 'María López',
-        lugarDestino: 'Recursos Materiales',
-        tipoVisita: 'Proveedor',
-        horaVisita: DateTime.now().add(const Duration(hours: 2)),
-        estado: 'Autorizada',
-        entradaRegistrada: true,
-        salidaRegistrada: false,
-      ),
-      VisitaHoyModel(
-        folio: 'VIS-003',
-        nombreVisitante: 'Carlos Sánchez',
-        lugarDestino: 'Dirección',
-        tipoVisita: 'Consulta',
-        horaVisita: DateTime.now().subtract(const Duration(hours: 1)),
-        estado: 'Autorizada',
-        entradaRegistrada: true,
-        salidaRegistrada: true,
-      ),
-    ];
+    AppLogger.info(_modulo, 'Obteniendo visitas del dia');
+    final respuesta = await _apiClient.get(
+      '/visitas/hoy',
+      parametros: {'telefono': telefono},
+    );
+    final lista = respuesta.data as List<dynamic>? ?? [];
+    return lista.map((v) => VisitaHoyModel.fromJson(v as Map<String, dynamic>)).toList();
   }
 }
