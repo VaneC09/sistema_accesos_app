@@ -25,6 +25,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Forzar renderer compatible
+        manifestPlaceholders["enableImpeller"] = "false"
     }
 
     buildTypes {

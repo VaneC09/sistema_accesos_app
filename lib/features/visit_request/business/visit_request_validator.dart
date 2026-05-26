@@ -46,12 +46,16 @@ class VisitRequestValidator {
   // Valida fecha de visita no sea pasada
   static void validarFecha(DateTime fecha) {
     final ahora = DateTime.now();
-    if (fecha.isBefore(ahora)) {
+    final hoy = DateTime(ahora.year, ahora.month, ahora.day);
+    final fechaSoloDia = DateTime(fecha.year, fecha.month, fecha.day);
+
+    if (fechaSoloDia.isBefore(hoy)) {
       throw const ValidationException(
         mensaje: 'La fecha de visita no puede ser anterior a la fecha actual',
       );
     }
   }
+
 
   // Valida campos completos de solicitud
   static void validarSolicitud({

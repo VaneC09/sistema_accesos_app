@@ -3,7 +3,7 @@
 // Archivo   : visit_request_screen.dart
 // Módulo    : features/visit_request/presentation/screens
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
+// Fecha     : 2026-05-25
 // Versión   : 1.0.0
 // Descripción: Pantalla de nueva solicitud de visita — RF-013, RF-014
 // =============================================================================
@@ -31,7 +31,6 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
   final _lugarController = TextEditingController();
   final _motivoController = TextEditingController();
 
-  String _tipoVisita = '';
   bool _esGrupal = false;
   DateTime? _fechaVisita;
   TimeOfDay? _horaVisita;
@@ -45,12 +44,6 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
   // Visitantes grupales
   final List<Map<String, TextEditingController>> _visitantesGrupales = [];
   final List<int> _tolerancias = [5, 10, 15, 20, 30, 45, 60];
-
-  @override
-  void initState() {
-    super.initState();
-    context.read<VisitRequestBloc>().add(CargarCatalogos());
-  }
 
   @override
   void dispose() {
@@ -100,23 +93,13 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
     if (hora != null) setState(() => _horaVisita = hora);
   }
 
-  void _onEnviarSolicitud(List<CatalogoModel> tiposVisita) {
+  void _onEnviarSolicitud() {
     if (!_formKey.currentState!.validate()) return;
 
     if (_fechaVisita == null || _horaVisita == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(AppStrings.errorCamposIncompletos),
-          backgroundColor: AppColors.actionRed,
-        ),
-      );
-      return;
-    }
-
-    if (_tipoVisita.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(AppStrings.errorTipoVisita),
           backgroundColor: AppColors.actionRed,
         ),
       );
@@ -131,15 +114,47 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
       _horaVisita!.minute,
     );
 
+    // Validar que la fecha no sea pasada
+    if (fechaCompleta.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('La fecha y hora de visita no puede ser anterior a la actual'),
+          backgroundColor: AppColors.actionRed,
+        ),
+      );
+      return;
+    }
+
     List<VisitanteModel> visitantes = [];
 
     if (_esGrupal) {
+      if (_visitantesGrupales.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Agregue al menos un visitante al grupo'),
+            backgroundColor: AppColors.actionRed,
+          ),
+        );
+        return;
+      }
       visitantes = _visitantesGrupales
           .map((v) => VisitanteModel(
         nombre: v['nombre']!.text.trim(),
         correo: v['correo']!.text.trim(),
       ))
           .toList();
+
+      // Validar correos duplicados
+      final correos = visitantes.map((v) => v.correo).toList();
+      if (correos.toSet().length != correos.length) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(AppStrings.errorCorreoDuplicado),
+            backgroundColor: AppColors.actionRed,
+          ),
+        );
+        return;
+      }
     } else {
       visitantes = [
         VisitanteModel(
@@ -150,7 +165,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
     }
 
     final solicitud = VisitRequestModel(
-      tipoVisita: _tipoVisita,
+      tipoVisita: 'Personal',
       esGrupal: _esGrupal,
       visitantes: visitantes,
       lugarDestino: _lugarController.text.trim(),
@@ -184,6 +199,10 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                     Navigator.pop(context);
                     Navigator.pop(context);
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryCoral,
+                    foregroundColor: AppColors.baseSurface,
+                  ),
                   child: const Text(AppStrings.botonAceptar),
                 ),
               ],
@@ -216,14 +235,8 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
         ),
         body: BlocBuilder<VisitRequestBloc, VisitRequestState>(
           builder: (context, state) {
-            if (state is VisitRequestLoading &&
-                state is! VisitRequestSuccess) {
-              return const LoadingWidget(mensaje: 'Cargando...');
-            }
-
-            List<CatalogoModel> tiposVisita = [];
-            if (state is CatalogosLoaded) {
-              tiposVisita = state.tiposVisita;
+            if (state is VisitRequestLoading) {
+              return const LoadingWidget(mensaje: 'Enviando solicitud...');
             }
 
             return Form(
@@ -233,41 +246,6 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Tipo de visita
-                    Text(
-                      AppStrings.labelTipoVisita,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    DropdownButtonFormField<String>(
-                      value: _tipoVisita.isEmpty ? null : _tipoVisita,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.category_outlined),
-                      ),
-                      hint: const Text('Seleccione tipo de visita'),
-                      items: tiposVisita.isEmpty
-                          ? [
-                        const DropdownMenuItem(
-                          value: 'Personal',
-                          child: Text('Personal'),
-                        ),
-                        const DropdownMenuItem(
-                          value: 'Proveedor',
-                          child: Text('Proveedor'),
-                        ),
-                      ]
-                          : tiposVisita
-                          .map((t) => DropdownMenuItem(
-                        value: t.nombre,
-                        child: Text(t.nombre),
-                      ))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() => _tipoVisita = value ?? '');
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-
                     // Switch grupal
                     Row(
                       children: [
@@ -435,9 +413,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                                 ))
                                     .toList(),
                                 onChanged: (value) {
-                                  setState(
-                                        () => _toleranciaAntes = value ?? 15,
-                                  );
+                                  setState(() => _toleranciaAntes = value ?? 15);
                                 },
                               ),
                             ],
@@ -464,9 +440,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                                 ))
                                     .toList(),
                                 onChanged: (value) {
-                                  setState(
-                                        () => _toleranciaDespues = value ?? 15,
-                                  );
+                                  setState(() => _toleranciaDespues = value ?? 15);
                                 },
                               ),
                             ],
@@ -482,7 +456,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         return PrimaryButtonWidget(
                           texto: AppStrings.botonEnviarSolicitud,
                           cargando: state is VisitRequestLoading,
-                          onPressed: () => _onEnviarSolicitud(tiposVisita),
+                          onPressed: _onEnviarSolicitud,
                         );
                       },
                     ),

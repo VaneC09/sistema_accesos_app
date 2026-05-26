@@ -207,8 +207,7 @@ class VisitRequestBloc extends Bloc<VisitRequestEvent, VisitRequestState> {
       }
 
       final resultado = await _repository.crearSolicitud(event.solicitud);
-      final folio = resultado.folio ?? 'VIS-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-
+      final folio = resultado.folio ?? 'VIS-${DateTime.now().millisecondsSinceEpoch.toString().substring(5, 13)}';
       AppLogger.info(_modulo, 'Solicitud creada: $folio');
       emit(VisitRequestSuccess(folio: folio));
     } on ValidationException catch (e) {

@@ -3,7 +3,7 @@
 // Archivo   : home_screen.dart
 // Módulo    : features/auth/presentation/screens
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
+// Fecha     : 2026-05-25
 // Versión   : 1.0.0
 // Descripción: Pantalla principal con menú según rol del usuario
 // =============================================================================
@@ -20,6 +20,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/loading_widget.dart';
 import '../../../../core/widgets/nueva_solicitud_wrapper.dart';
 import '../../../visit_request/presentation/screens/mis_solicitudes_screen.dart';
+import '../../../visit_request/presentation/screens/consulta_screen.dart';
 import '../../../visit_authorization/presentation/screens/autorizaciones_screen.dart';
 import '../../../access_control/bloc/access_control_bloc.dart';
 import '../../../access_control/data/access_repository.dart';
@@ -44,9 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (state is AuthUnauthenticated) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(
-              builder: (_) => const _LoginRedirect(),
-            ),
+            MaterialPageRoute(builder: (_) => const _LoginRedirect()),
                 (route) => false,
           );
         }
@@ -76,10 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(
-              Icons.logout_rounded,
-              color: AppColors.baseSurface,
-            ),
+            icon: const Icon(Icons.logout_rounded, color: AppColors.baseSurface),
             onPressed: () => _onLogoutPressed(context),
           ),
         ],
@@ -154,9 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.primaryCoral,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => NuevaSolicitudWrapper(),
-              ),
+              MaterialPageRoute(builder: (_) => NuevaSolicitudWrapper()),
             ),
           ),
           _MenuCard(
@@ -165,9 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.headingDark,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const MisSolicitudesScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const MisSolicitudesScreen()),
             ),
           ),
         ];
@@ -181,9 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.primaryCoral,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => NuevaSolicitudWrapper(),
-              ),
+              MaterialPageRoute(builder: (_) => NuevaSolicitudWrapper()),
             ),
           ),
           _MenuCard(
@@ -192,9 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.headingDark,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const MisSolicitudesScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const MisSolicitudesScreen()),
             ),
           ),
           _MenuCard(
@@ -203,9 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.successGreen,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const AutorizacionesScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const AutorizacionesScreen()),
             ),
           ),
           _MenuCard(
@@ -214,9 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.headingSky,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const NotificationsScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
             ),
           ),
         ];
@@ -229,9 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.primaryCoral,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const QrScannerScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const QrScannerScreen()),
             ),
           ),
           _MenuCard(
@@ -240,9 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.headingDark,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const VisitasHoyScreen(),
-              ),
+              MaterialPageRoute(builder: (_) => const VisitasHoyScreen()),
             ),
           ),
           _MenuCard(
@@ -250,13 +230,6 @@ class _HomeScreenState extends State<HomeScreen> {
             titulo: AppStrings.menuRegistroManual,
             color: AppColors.headingSky,
             onTap: () async {
-              final authState = context.read<AuthBloc>().state;
-              String telefono = '';
-              String area = '';
-              if (authState is AuthAuthenticated) {
-                telefono = authState.nombre;
-                area = authState.nombre;
-              }
               final codigo = await ManualCodeDialog.mostrar(context);
               if (codigo != null && context.mounted) {
                 Navigator.push(
@@ -266,16 +239,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       create: (_) => AccessControlBloc(
                         repository: AccessRepository(),
                       ),
-                      child: _RegistroManualScreen(
-                        codigo: codigo,
-                        telefono: telefono,
-                        area: area,
-                      ),
+                      child: _RegistroManualScreen(codigo: codigo),
                     ),
                   ),
                 );
               }
             },
+          ),
+          _MenuCard(
+            icono: Icons.help_outline_rounded,
+            titulo: 'Visita de Consulta',
+            color: AppColors.warningOrange,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ConsultaScreen()),
+            ),
           ),
         ];
 
@@ -292,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── Login Redirect ────────────────────────────────────────────────────────────
+// ── Login Redirect ─────────────────────────────────────────────────────────────
 class _LoginRedirect extends StatefulWidget {
   const _LoginRedirect();
 
@@ -322,25 +300,17 @@ class _LoginRedirectState extends State<_LoginRedirect> {
   Widget build(BuildContext context) {
     return const Scaffold(
       body: Center(
-        child: CircularProgressIndicator(
-          color: AppColors.primaryCoral,
-        ),
+        child: CircularProgressIndicator(color: AppColors.primaryCoral),
       ),
     );
   }
 }
 
-// ── Registro Manual Screen ────────────────────────────────────────────────────
+// ── Registro Manual Screen ─────────────────────────────────────────────────────
 class _RegistroManualScreen extends StatefulWidget {
   final String codigo;
-  final String telefono;
-  final String area;
 
-  const _RegistroManualScreen({
-    required this.codigo,
-    required this.telefono,
-    required this.area,
-  });
+  const _RegistroManualScreen({required this.codigo});
 
   @override
   State<_RegistroManualScreen> createState() => _RegistroManualScreenState();
@@ -353,8 +323,8 @@ class _RegistroManualScreenState extends State<_RegistroManualScreen> {
     context.read<AccessControlBloc>().add(
       RegistroManual(
         codigoNumerico: widget.codigo,
-        telefono: widget.telefono,
-        area: widget.area,
+        telefono: '',
+        area: '',
       ),
     );
   }
@@ -370,10 +340,7 @@ class _RegistroManualScreenState extends State<_RegistroManualScreen> {
           style: TextStyle(color: AppColors.baseSurface),
         ),
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.baseSurface,
-          ),
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.baseSurface),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -429,7 +396,7 @@ class _RegistroManualScreenState extends State<_RegistroManualScreen> {
   }
 }
 
-// ── Menu Card ─────────────────────────────────────────────────────────────────
+// ── Menu Card ──────────────────────────────────────────────────────────────────
 class _MenuCard extends StatelessWidget {
   final IconData icono;
   final String titulo;
