@@ -31,7 +31,7 @@ class VisitRequestDatasource {
     if (estado != null) parametros['estado'] = estado;
     if (fechaInicio != null) parametros['fecha_inicio'] = fechaInicio.toIso8601String();
     if (fechaFin != null) parametros['fecha_fin'] = fechaFin.toIso8601String();
-    final respuesta = await _apiClient.get('/solicitudes/mis-solicitudes', parametros: parametros);
+    final respuesta = await _apiClient.get('/solicitudes', parametros: parametros);
     final lista = respuesta.data as List<dynamic>? ?? [];
     return lista.map((s) => VisitRequestModel.fromJson(s as Map<String, dynamic>)).toList();
   }
@@ -46,9 +46,11 @@ class VisitRequestDatasource {
   }
 
   Future<List<CatalogoModel>> obtenerTiposVisita() async {
-    final respuesta = await _apiClient.get('/catalogos/tipos-visita');
-    final lista = respuesta.data as List<dynamic>? ?? [];
-    return lista.map((t) => CatalogoModel.fromJson(t as Map<String, dynamic>)).toList();
+    return [
+      const CatalogoModel(id: 1, nombre: 'Proveedor'),
+      const CatalogoModel(id: 2, nombre: 'Institucional / Negocios'),
+      const CatalogoModel(id: 3, nombre: 'Personal'),
+    ];
   }
 
   Future<List<CatalogoModel>> obtenerDepartamentos() async {

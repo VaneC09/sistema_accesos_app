@@ -1,32 +1,35 @@
-// =============================================================================
+/// =============================================================================
 // Proyecto  : Sistema de Gestión de Accesos y Visitas
 // Archivo   : visit_request_model.dart
 // Módulo    : features/visit_request/data
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
+// Fecha     : 2026-05-25
 // Versión   : 1.0.0
-// Descripción: Modelos de solicitud de visita — RF-013, RF-014
 // =============================================================================
 
 class VisitanteModel {
   final String nombre;
+  final String apellidos;
   final String correo;
 
   const VisitanteModel({
     required this.nombre,
+    this.apellidos = '',
     required this.correo,
   });
 
   factory VisitanteModel.fromJson(Map<String, dynamic> json) {
     return VisitanteModel(
       nombre: json['nombre'] as String? ?? '',
-      correo: json['correo'] as String? ?? '',
+      apellidos: json['apellidos'] as String? ?? '',
+      correo: json['correo_personal'] as String? ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'nombre': nombre,
+      'apellidos': apellidos,
       'correo': correo,
     };
   }
@@ -34,7 +37,7 @@ class VisitanteModel {
 
 class VisitRequestModel {
   final int? idSolicitud;
-  final String tipoVisita;
+  final String tipoVisita; // <-- NUEVO CAMPO
   final bool esGrupal;
   final List<VisitanteModel> visitantes;
   final String lugarDestino;
@@ -49,7 +52,7 @@ class VisitRequestModel {
 
   const VisitRequestModel({
     this.idSolicitud,
-    required this.tipoVisita,
+    required this.tipoVisita, // <-- NUEVO CAMPO REQUERIDO
     required this.esGrupal,
     required this.visitantes,
     required this.lugarDestino,
@@ -66,8 +69,8 @@ class VisitRequestModel {
   factory VisitRequestModel.fromJson(Map<String, dynamic> json) {
     return VisitRequestModel(
       idSolicitud: json['id_solicitud'] as int?,
-      tipoVisita: json['tipo_visita'] as String? ?? '',
-      esGrupal: json['es_grupal'] as bool? ?? false,
+      tipoVisita: json['tipo_visita'] as String? ?? 'Personal', // <-- MAPEO DESDE JSON
+      esGrupal: (json['numero_visitantes'] as int? ?? 1) > 1,
       visitantes: (json['visitantes'] as List<dynamic>? ?? [])
           .map((v) => VisitanteModel.fromJson(v as Map<String, dynamic>))
           .toList(),
@@ -78,8 +81,8 @@ class VisitRequestModel {
       motivoVisita: json['motivo_visita'] as String? ?? '',
       toleranciaAntesMinutos: json['tolerancia_antes'] as int? ?? 15,
       toleranciaDespuesMinutos: json['tolerancia_despues'] as int? ?? 15,
-      estado: json['estado'] as String? ?? 'Pendiente',
-      folio: json['folio'] as String?,
+      estado: _mapearEstado(json['id_estado_solicitud'] as int? ?? 1),
+      folio: 'VIS-${json['id_solicitud']?.toString().padLeft(8, '0') ?? '00000000'}',
       fechaCreacion: json['fecha_creacion'] != null
           ? DateTime.parse(json['fecha_creacion'] as String)
           : null,
@@ -87,16 +90,27 @@ class VisitRequestModel {
     );
   }
 
+  static String _mapearEstado(int id) {
+    switch (id) {
+      case 1: return 'Pendiente';
+      case 2: return 'Autorizada';
+      case 3: return 'Rechazada';
+      case 4: return 'Cancelada';
+      default: return 'Pendiente';
+    }
+  }
+
   Map<String, dynamic> toJson() {
     return {
-      'tipo_visita': tipoVisita,
-      'es_grupal': esGrupal,
-      'visitantes': visitantes.map((v) => v.toJson()).toList(),
-      'lugar_encuentro': lugarDestino,
+      'tipo_visita': tipoVisita, // <-- ENVÍO AL BACKEND
       'fecha_inicio': fechaVisita.toIso8601String(),
+      'lugar_encuentro': lugarDestino,
       'motivo_visita': motivoVisita,
+      'id_tipo_solicitud': esGrupal ? 2 : 1,
       'tolerancia_antes': toleranciaAntesMinutos,
       'tolerancia_despues': toleranciaDespuesMinutos,
+      'numero_visitantes': visitantes.length,
+      'visitantes': visitantes.map((v) => v.toJson()).toList(),
     };
   }
 }

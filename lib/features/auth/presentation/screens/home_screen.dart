@@ -52,14 +52,56 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
+          // 1. Si la autenticación es exitosa, muestra el menú
           if (state is AuthAuthenticated) {
             return _buildHome(context, state);
           }
-          return const SizedBox.shrink();
+
+          // 2. Si ocurre un error, muestra el mensaje en pantalla para diagnóstico
+          if (state is AuthError) {
+            return Scaffold(
+              backgroundColor: AppColors.baseSurface,
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.paddingPantalla),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error_outline_rounded, color: AppColors.actionRed, size: 64),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Error de Autenticación:\n${state.mensaje}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppColors.actionRed, fontSize: 16),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      ElevatedButton(
+                        onPressed: () {
+                          context.read<AuthBloc>().add(LogoutRequested());
+                        },
+                        child: const Text('Volver al Login'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          // 3. Mientras procesa o carga, muestra el indicador visual
+          return const Scaffold(
+            backgroundColor: AppColors.baseSurface,
+            body: Center(
+              child: CircularProgressIndicator(
+                color: AppColors.primaryCoral,
+              ),
+            ),
+          );
         },
       ),
     );
   }
+
 
   Widget _buildHome(BuildContext context, AuthAuthenticated state) {
     return Scaffold(

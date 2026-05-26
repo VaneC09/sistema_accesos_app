@@ -16,6 +16,7 @@ import '../../../../core/constants/app_strings.dart';
 class VisitanteFormWidget extends StatelessWidget {
   final int indice;
   final TextEditingController nombreController;
+  final TextEditingController apellidosController;
   final TextEditingController correoController;
   final VoidCallback? onEliminar;
   final bool mostrarEliminar;
@@ -24,6 +25,7 @@ class VisitanteFormWidget extends StatelessWidget {
     super.key,
     required this.indice,
     required this.nombreController,
+    required this.apellidosController,
     required this.correoController,
     this.onEliminar,
     this.mostrarEliminar = true,
@@ -42,7 +44,6 @@ class VisitanteFormWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Encabezado
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -67,24 +68,36 @@ class VisitanteFormWidget extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-
-          // Campo nombre
           TextFormField(
             controller: nombreController,
+            textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
-              labelText: 'Nombre',
+              labelText: 'Nombre(s)',
               prefixIcon: Icon(Icons.person_outline_rounded),
             ),
             validator: (value) {
-              if (value == null || value.trim().length < 5) {
-                return AppStrings.errorNombreMinimo;
+              if (value == null || value.trim().length < 2) {
+                return 'Ingrese el nombre (mínimo 2 caracteres)';
               }
               return null;
             },
           ),
           const SizedBox(height: AppSpacing.sm),
-
-          // Campo correo
+          TextFormField(
+            controller: apellidosController,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Apellidos',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().length < 2) {
+                return 'Ingrese los apellidos (mínimo 2 caracteres)';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
           TextFormField(
             controller: correoController,
             keyboardType: TextInputType.emailAddress,
@@ -93,7 +106,11 @@ class VisitanteFormWidget extends StatelessWidget {
               prefixIcon: Icon(Icons.email_outlined),
             ),
             validator: (value) {
-              if (value == null || !value.contains('@')) {
+              if (value == null || value.trim().isEmpty) {
+                return AppStrings.errorCorreoInvalido;
+              }
+              final regex = RegExp(r'^[\w.-]+@[\w.-]+\.\w+$');
+              if (!regex.hasMatch(value.trim())) {
                 return AppStrings.errorCorreoInvalido;
               }
               return null;

@@ -36,6 +36,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
   TimeOfDay? _horaVisita;
   int _toleranciaAntes = 15;
   int _toleranciaDespues = 15;
+  String _tipoVisita = 'Personal';
 
   // Visitante individual
   final _nombreController = TextEditingController();
@@ -165,7 +166,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
     }
 
     final solicitud = VisitRequestModel(
-      tipoVisita: 'Personal',
+      tipoVisita: _tipoVisita,
       esGrupal: _esGrupal,
       visitantes: visitantes,
       lugarDestino: _lugarController.text.trim(),
@@ -246,6 +247,20 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    DropdownButtonFormField<String>(
+                      value: _tipoVisita,
+                      decoration: const InputDecoration(
+                        labelText: 'Tipo de visita',
+                        prefixIcon: Icon(Icons.category_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'Proveedor', child: Text('Proveedor')),
+                        DropdownMenuItem(value: 'Institucional / Negocios', child: Text('Institucional / Negocios')),
+                        DropdownMenuItem(value: 'Personal', child: Text('Personal')),
+                      ],
+                      onChanged: (value) => setState(() => _tipoVisita = value ?? 'Personal'),
+                    ),
+                    const SizedBox(height: AppSpacing.md), // Espaciado recomendado para mantener el diseño
                     // Switch grupal
                     Row(
                       children: [
@@ -275,6 +290,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                       VisitanteFormWidget(
                         indice: 0,
                         nombreController: _nombreController,
+                        apellidosController: TextEditingController(),
                         correoController: _correoController,
                         mostrarEliminar: false,
                       ),
@@ -291,6 +307,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         return VisitanteFormWidget(
                           indice: entry.key,
                           nombreController: entry.value['nombre']!,
+                          apellidosController: TextEditingController(),
                           correoController: entry.value['correo']!,
                           onEliminar: () => _eliminarVisitante(entry.key),
                         );

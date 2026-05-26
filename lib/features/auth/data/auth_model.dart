@@ -6,7 +6,6 @@
 // Fecha     : 2026-05-23
 // Versión   : 1.0.0
 // =============================================================================
-
 import 'dart:convert';
 
 class AuthModel {
@@ -32,45 +31,51 @@ class AuthModel {
     required this.puesto,
   });
 
+  // Constructor para mapear el JSON proveniente del Backend u origen de datos
   factory AuthModel.fromJson(Map<String, dynamic> json) {
+    final String rolBackend = (json['rol'] ?? json['role'] ?? 'solicitante').toString().toLowerCase();
+
+    String rolApp;
+    switch (rolBackend) {
+      case 'autorizador':
+      case 'jefe':
+        rolApp = 'jefe';
+        break;
+      case 'vigilante':
+        rolApp = 'vigilante';
+        break;
+      default:
+        rolApp = 'empleado';
+    }
+
     return AuthModel(
       token: json['token'] as String? ?? '',
-      usuario: json['usuario'] as String? ?? '',
-      rol: json['rol'] as String? ?? 'empleado',
-      nombre: json['nombre'] as String? ?? '',
-      correoPersonal: json['correo_personal'] as String? ?? '',
+      usuario: json['email'] as String? ?? '',
+      rol: rolApp,
+      nombre: json['name'] as String? ?? '',
+      correoPersonal: json['email'] as String? ?? '',
       correoPuesto: json['correo_puesto'] as String? ?? '',
-      idEmpleado: json['id_empleado'] as int? ?? 0,
+      idEmpleado: json['id'] as int? ?? 0,
       idDepartamento: json['id_departamento'] as int? ?? 0,
-      puesto: json['puesto'] as String? ?? '',
+      puesto: rolBackend,
     );
   }
 
+  // Constructor requerido por el repositorio para leer strings de persistencia local
+  factory AuthModel.fromString(String jsonString) {
+    return AuthModel.fromJson(json.decode(jsonString) as Map<String, dynamic>);
+  }
+
+  // Método útil por si el repositorio requiere guardar el modelo como String posteriormente
   Map<String, dynamic> toJson() {
     return {
       'token': token,
-      'usuario': usuario,
-      'rol': rol,
-      'nombre': nombre,
-      'correo_personal': correoPersonal,
+      'email': usuario,
+      'rol': puesto, // Guarda el rol original del backend
+      'name': nombre,
       'correo_puesto': correoPuesto,
-      'id_empleado': idEmpleado,
+      'id': idEmpleado,
       'id_departamento': idDepartamento,
-      'puesto': puesto,
     };
-  }
-
-  factory AuthModel.fromString(String jsonStr) {
-    try {
-      final mapa = jsonDecode(jsonStr) as Map<String, dynamic>;
-      return AuthModel.fromJson(mapa);
-    } catch (e) {
-      throw Exception('Error al parsear sesión guardada: $e');
-    }
-  }
-
-  @override
-  String toString() {
-    return jsonEncode(toJson());
   }
 }

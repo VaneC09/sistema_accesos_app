@@ -247,6 +247,7 @@ class _ConsultaViewState extends State<_ConsultaView> {
                     // Lugar destino — RF-014: solo 2 opciones
                     DropdownButtonFormField<String>(
                       value: _lugarSeleccionado.isEmpty ? null : _lugarSeleccionado,
+                      isExpanded: true,   // ← agregar esto
                       decoration: const InputDecoration(
                         labelText: 'Lugar destino',
                       ),

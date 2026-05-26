@@ -35,37 +35,28 @@ class QrScanResultModel {
     this.llegaTarde = false,
     this.llegaAnticiapdo = false,
   });
-
   factory QrScanResultModel.fromJson(Map<String, dynamic> json) {
-    return QrScanResultModel(
-      folio: json['folio'] as String? ?? '',
-      nombreVisitante: json['nombre_visitante'] as String? ?? '',
-      lugarDestino: json['lugar_destino'] as String? ?? '',
-      estado: json['estado'] as String? ?? '',
-      tipoAcceso: json['tipo_acceso'] as String? ?? 'entrada',
-      accesoConcedido: json['acceso_concedido'] as bool? ?? false,
-      motivoRechazo: json['motivo_rechazo'] as String?,
-      horaToleranciaInicio: json['hora_tolerancia_inicio'] != null
-          ? DateTime.parse(json['hora_tolerancia_inicio'] as String)
-          : null,
-      horaToleranciaFin: json['hora_tolerancia_fin'] != null
-          ? DateTime.parse(json['hora_tolerancia_fin'] as String)
-          : null,
-      llegaTarde: json['llega_tarde'] as bool? ?? false,
-      llegaAnticiapdo: json['llega_anticipado'] as bool? ?? false,
-    );
-  }
+    final data = json['data'] as Map<String, dynamic>? ?? json;
+    final sv = data['solicitud_visitante'] as Map<String, dynamic>?;
+    final visitante = sv?['visitante'] as Map<String, dynamic>?;
+    final solicitud = sv?['solicitud'] as Map<String, dynamic>?;
 
-  Map<String, dynamic> toJson() {
-    return {
-      'folio': folio,
-      'nombre_visitante': nombreVisitante,
-      'lugar_destino': lugarDestino,
-      'estado': estado,
-      'tipo_acceso': tipoAcceso,
-      'acceso_concedido': accesoConcedido,
-      'motivo_rechazo': motivoRechazo,
-    };
+    final nombre = visitante != null
+        ? '${visitante['nombre']} ${visitante['apellidos']}'
+        : '';
+    final lugar = solicitud?['lugar_encuentro'] as String? ?? '';
+    final idQr = data['id_qr'] as int? ?? 0;
+
+    return QrScanResultModel(
+      folio: 'VIS-${idQr.toString().padLeft(8, '0')}',
+      nombreVisitante: nombre,
+      lugarDestino: lugar,
+      estado: 'Autorizada',
+      tipoAcceso: 'entrada',
+      accesoConcedido: true,
+      llegaTarde: false,
+      llegaAnticiapdo: false,
+    );
   }
 }
 
