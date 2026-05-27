@@ -21,21 +21,40 @@ class AuthDatasource {
 
   Future<AuthModel> login(String usuario, String contrasena) async {
     AppLogger.info(_modulo, 'Intentando login: $usuario');
+
     final respuesta = await _apiClient.post(
       '/login',
-      datos: { 'usuario': usuario, 'password': contrasena },
+      datos: {
+        'usuario': usuario,
+        'password': contrasena,
+      },
     );
-    AppLogger.info(_modulo, 'Login exitoso: $usuario');
-    return AuthModel.fromJson(respuesta.data as Map<String, dynamic>);
+
+    // El backend responde { "message": "...", "data": { token, rol, ... } }
+    // Hay que extraer el objeto "data" antes de parsear el modelo
+    final body = respuesta.data as Map<String, dynamic>;
+    final payload = body['data'] as Map<String, dynamic>;
+
+    AppLogger.info(_modulo, 'Login exitoso — rol: ${payload['rol']}');
+    return AuthModel.fromJson(payload);
   }
 
   Future<AuthModel> loginVigilante(String telefono, String area) async {
-    AppLogger.info(_modulo, 'Login vigilante - area: $area');
+    AppLogger.info(_modulo, 'Login vigilante — area: $area');
+
     final respuesta = await _apiClient.post(
       '/vigilante/login',
-      datos: { 'telefono': telefono, 'area': area },
+      datos: {
+        'telefono': telefono,
+        'area': area,
+      },
     );
-    return AuthModel.fromJson(respuesta.data as Map<String, dynamic>);
+
+    final body = respuesta.data as Map<String, dynamic>;
+    final payload = body['data'] as Map<String, dynamic>;
+
+    AppLogger.info(_modulo, 'Login vigilante exitoso');
+    return AuthModel.fromJson(payload);
   }
 
   Future<void> logout(String token) async {

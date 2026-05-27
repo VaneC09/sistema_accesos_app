@@ -11,7 +11,7 @@ import 'dart:convert';
 class AuthModel {
   final String token;
   final String usuario;
-  final String rol;
+  final String rol;      // 'autorizador', 'solicitante', 'vigilante'
   final String nombre;
   final String correoPersonal;
   final String correoPuesto;
@@ -32,38 +32,39 @@ class AuthModel {
   });
 
   factory AuthModel.fromJson(Map<String, dynamic> json) {
-    // El backend ahora manda 'rol' con valor granular:
-    // 'jefe', 'empleado', 'recursos_materiales'
-    // y 'rol_api' con 'autorizador' o 'solicitante'
-    final String rolGranular = (json['rol'] ?? 'empleado').toString().toLowerCase();
+    // El backend manda exactamente: 'autorizador', 'solicitante', 'vigilante'
+    // en el campo 'rol'. No se transforma, se usa directo.
+    final String rol = (json['rol'] ?? 'solicitante').toString().toLowerCase().trim();
 
     return AuthModel(
-      token: json['token'] as String? ?? '',
-      usuario: json['email'] as String? ?? '',
-      rol: rolGranular,
-      nombre: json['name'] as String? ?? '',
-      correoPersonal: json['email'] as String? ?? '',
-      correoPuesto: json['departamento'] as String? ?? '',
-      idEmpleado: json['id_empleado_sam'] as int? ?? json['id'] as int? ?? 0,
+      token:          json['token']           as String? ?? '',
+      usuario:        json['email']           as String? ?? '',
+      rol:            rol,
+      nombre:         json['name']            as String? ?? '',
+      correoPersonal: json['email']           as String? ?? '',
+      correoPuesto:   json['departamento']    as String? ?? '',
+      idEmpleado:     json['id_empleado_sam'] as int?
+          ?? json['id']           as int? ?? 0,
       idDepartamento: json['id_departamento'] as int? ?? 0,
-      puesto: json['rol_api'] as String? ?? rolGranular,
+      puesto:         json['rol_api']         as String? ?? rol,
     );
   }
 
   factory AuthModel.fromString(String jsonString) {
-    return AuthModel.fromJson(json.decode(jsonString) as Map<String, dynamic>);
+    return AuthModel.fromJson(
+      json.decode(jsonString) as Map<String, dynamic>,
+    );
   }
 
   Map<String, dynamic> toJson() => {
-    'token': token,
-    'usuario': usuario,
-    'rol': rol,
-    'name': nombre,
-    'email': correoPersonal,
-    'correo_puesto': correoPuesto,
-    'id': idEmpleado,
+    'token':           token,
+    'email':           usuario,   // ← clave 'email' para que fromJson la lea bien
+    'rol':             rol,
+    'name':            nombre,
+    'departamento':    correoPuesto,
+    'id_empleado_sam': idEmpleado,
     'id_departamento': idDepartamento,
-    'rol_api': puesto,
+    'rol_api':         puesto,
   };
 
   @override

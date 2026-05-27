@@ -169,12 +169,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _getRolLabel(String rol) {
     switch (rol) {
-      case 'empleado':
+      case 'solicitante':
         return 'Empleado';
-      case 'jefe':
-        return 'Jefe de Área';
-      case 'recursos_materiales':
-        return 'Recursos Materiales';
+      case 'autorizador':
+        return 'Jefe de Área / Autorizador';
       case 'vigilante':
         return 'Vigilante';
       default:
@@ -182,9 +180,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+
   List<Widget> _getMenuItems(BuildContext context, String rol) {
     switch (rol) {
-      case 'empleado':
+      case 'solicitante':
         return [
           _MenuCard(
             icono: Icons.add_circle_outline_rounded,
@@ -206,8 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ];
 
-      case 'jefe':
-      case 'recursos_materiales':
+      case 'autorizador':
         return [
           _MenuCard(
             icono: Icons.add_circle_outline_rounded,
@@ -300,7 +298,27 @@ class _HomeScreenState extends State<HomeScreen> {
         ];
 
       default:
-        return [];
+      // Si llega un rol desconocido, muestra al menos el menú básico
+        return [
+          _MenuCard(
+            icono: Icons.add_circle_outline_rounded,
+            titulo: AppStrings.menuNuevaSolicitud,
+            color: AppColors.primaryCoral,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => NuevaSolicitudWrapper()),
+            ),
+          ),
+          _MenuCard(
+            icono: Icons.list_alt_rounded,
+            titulo: AppStrings.menuMisSolicitudes,
+            color: AppColors.headingDark,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MisSolicitudesScreen()),
+            ),
+          ),
+        ];
     }
   }
 
