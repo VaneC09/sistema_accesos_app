@@ -3,8 +3,8 @@
 // Archivo   : auth_model.dart
 // Módulo    : features/auth/data
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
-// Versión   : 1.0.0
+// Fecha     : 2026-05-26
+// Versión   : 1.1.0
 // =============================================================================
 import 'dart:convert';
 
@@ -32,18 +32,21 @@ class AuthModel {
   });
 
   factory AuthModel.fromJson(Map<String, dynamic> json) {
-    final String rol = (json['rol'] ?? 'solicitante').toString().toLowerCase();
+    // El backend ahora manda 'rol' con valor granular:
+    // 'jefe', 'empleado', 'recursos_materiales'
+    // y 'rol_api' con 'autorizador' o 'solicitante'
+    final String rolGranular = (json['rol'] ?? 'empleado').toString().toLowerCase();
 
     return AuthModel(
       token: json['token'] as String? ?? '',
-      usuario: json['usuario'] as String? ?? '',
-      rol: rol,
+      usuario: json['email'] as String? ?? '',
+      rol: rolGranular,
       nombre: json['name'] as String? ?? '',
       correoPersonal: json['email'] as String? ?? '',
-      correoPuesto: json['correo_puesto'] as String? ?? '',
-      idEmpleado: json['id'] as int? ?? 0,
+      correoPuesto: json['departamento'] as String? ?? '',
+      idEmpleado: json['id_empleado_sam'] as int? ?? json['id'] as int? ?? 0,
       idDepartamento: json['id_departamento'] as int? ?? 0,
-      puesto: rol,
+      puesto: json['rol_api'] as String? ?? rolGranular,
     );
   }
 
@@ -60,9 +63,9 @@ class AuthModel {
     'correo_puesto': correoPuesto,
     'id': idEmpleado,
     'id_departamento': idDepartamento,
+    'rol_api': puesto,
   };
 
   @override
   String toString() => json.encode(toJson());
 }
-
