@@ -4,7 +4,7 @@
 // Módulo    : core/connection
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
-// Versión   : 1.0.0
+// Versión   : 1.0.1
 // Descripción: Cliente HTTP centralizado con Dio — MPF-OMEGA-04 §6.5
 // =============================================================================
 
@@ -25,17 +25,12 @@ class ApiClient {
 
   static const String _modulo = 'API_CLIENT';
 
-  // ── Inicialización ────────────────────────────────────────────────────────
   void inicializar() {
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
-        connectTimeout: Duration(
-          seconds: AppConfig.timeoutConexionSegundos,
-        ),
-        receiveTimeout: Duration(
-          seconds: AppConfig.timeoutRespuestaSegundos,
-        ),
+        connectTimeout: Duration(seconds: AppConfig.timeoutConexionSegundos),
+        receiveTimeout: Duration(seconds: AppConfig.timeoutRespuestaSegundos),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -48,22 +43,15 @@ class ApiClient {
     AppLogger.info(_modulo, 'Cliente HTTP inicializado — ${AppConfig.baseUrl}');
   }
 
-  // ── Interceptores ─────────────────────────────────────────────────────────
   void _agregarInterceptores() {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Inyectar token de autenticación
-          final token = await _storage.read(
-            key: AppConfig.claveToken,
-          );
+          final token = await _storage.read(key: AppConfig.claveToken);
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
-          AppLogger.info(
-            _modulo,
-            'Petición: ${options.method} ${options.path}',
-          );
+          AppLogger.info(_modulo, 'Petición: ${options.method} ${options.path}');
           return handler.next(options);
         },
         onResponse: (response, handler) {
@@ -79,10 +67,15 @@ class ApiClient {
             'Error: ${error.response?.statusCode} ${error.requestOptions.path}',
           );
 
-          // Manejo de sesión expirada — 401
+          // Solo limpiar sesión si el 401 viene de una ruta protegida,
+          // no del endpoint de login
           if (error.response?.statusCode == 401) {
-            AppLogger.warning(_modulo, 'Token expirado — cerrando sesión');
-            await _limpiarSesion();
+            final esEndpointLogin = error.requestOptions.path.contains('/login');
+
+            if (!esEndpointLogin) {
+              AppLogger.warning(_modulo, 'Token expirado — cerrando sesión');
+              await _limpiarSesion();
+            }
           }
 
           return handler.next(error);
@@ -91,26 +84,16 @@ class ApiClient {
     );
   }
 
-  // ── Métodos HTTP ──────────────────────────────────────────────────────────
-  Future<Response> get(
-      String endpoint, {
-        Map<String, dynamic>? parametros,
-      }) async {
+  Future<Response> get(String endpoint, {Map<String, dynamic>? parametros}) async {
     try {
-      final respuesta = await _dio.get(
-        endpoint,
-        queryParameters: parametros,
-      );
+      final respuesta = await _dio.get(endpoint, queryParameters: parametros);
       return respuesta;
     } catch (e) {
       throw _manejarError(e);
     }
   }
 
-  Future<Response> post(
-      String endpoint, {
-        Map<String, dynamic>? datos,
-      }) async {
+  Future<Response> post(String endpoint, {Map<String, dynamic>? datos}) async {
     try {
       final respuesta = await _dio.post(endpoint, data: datos);
       return respuesta;
@@ -119,10 +102,7 @@ class ApiClient {
     }
   }
 
-  Future<Response> put(
-      String endpoint, {
-        Map<String, dynamic>? datos,
-      }) async {
+  Future<Response> put(String endpoint, {Map<String, dynamic>? datos}) async {
     try {
       final respuesta = await _dio.put(endpoint, data: datos);
       return respuesta;
@@ -140,7 +120,6 @@ class ApiClient {
     }
   }
 
-  // ── Manejo de errores ─────────────────────────────────────────────────────
   AppException _manejarError(dynamic error) {
     if (error is DioException) {
       switch (error.type) {
@@ -151,16 +130,13 @@ class ApiClient {
           return const TimeoutException(
             mensaje: 'Tiempo de espera agotado. Intente nuevamente',
           );
-
         case DioExceptionType.connectionError:
           AppLogger.error(_modulo, 'Sin conexión a internet');
           return const NetworkException(
             mensaje: 'Sin conexión. Verifique su red e intente nuevamente',
           );
-
         case DioExceptionType.badResponse:
           return _manejarCodigoHttp(error.response?.statusCode);
-
         default:
           AppLogger.error(_modulo, 'Error desconocido: ${error.message}');
           return const NetworkException(
@@ -201,10 +177,8 @@ class ApiClient {
     }
   }
 
-  // ── Limpieza de sesión ────────────────────────────────────────────────────
   Future<void> _limpiarSesion() async {
     await _storage.delete(key: AppConfig.claveToken);
-    await _storage.delete(key: AppConfig.claveRefreshToken);
     await _storage.delete(key: AppConfig.claveUsuario);
     await _storage.delete(key: AppConfig.claveRol);
     AppLogger.info(_modulo, 'Sesión eliminada del almacenamiento seguro');

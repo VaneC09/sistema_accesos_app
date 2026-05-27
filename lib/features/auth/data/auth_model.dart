@@ -31,51 +31,38 @@ class AuthModel {
     required this.puesto,
   });
 
-  // Constructor para mapear el JSON proveniente del Backend u origen de datos
   factory AuthModel.fromJson(Map<String, dynamic> json) {
-    final String rolBackend = (json['rol'] ?? json['role'] ?? 'solicitante').toString().toLowerCase();
-
-    String rolApp;
-    switch (rolBackend) {
-      case 'autorizador':
-      case 'jefe':
-        rolApp = 'jefe';
-        break;
-      case 'vigilante':
-        rolApp = 'vigilante';
-        break;
-      default:
-        rolApp = 'empleado';
-    }
+    final String rol = (json['rol'] ?? 'solicitante').toString().toLowerCase();
 
     return AuthModel(
       token: json['token'] as String? ?? '',
-      usuario: json['email'] as String? ?? '',
-      rol: rolApp,
+      usuario: json['usuario'] as String? ?? '',
+      rol: rol,
       nombre: json['name'] as String? ?? '',
       correoPersonal: json['email'] as String? ?? '',
       correoPuesto: json['correo_puesto'] as String? ?? '',
       idEmpleado: json['id'] as int? ?? 0,
       idDepartamento: json['id_departamento'] as int? ?? 0,
-      puesto: rolBackend,
+      puesto: rol,
     );
   }
 
-  // Constructor requerido por el repositorio para leer strings de persistencia local
   factory AuthModel.fromString(String jsonString) {
     return AuthModel.fromJson(json.decode(jsonString) as Map<String, dynamic>);
   }
 
-  // Método útil por si el repositorio requiere guardar el modelo como String posteriormente
-  Map<String, dynamic> toJson() {
-    return {
-      'token': token,
-      'email': usuario,
-      'rol': puesto, // Guarda el rol original del backend
-      'name': nombre,
-      'correo_puesto': correoPuesto,
-      'id': idEmpleado,
-      'id_departamento': idDepartamento,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'token': token,
+    'usuario': usuario,
+    'rol': rol,
+    'name': nombre,
+    'email': correoPersonal,
+    'correo_puesto': correoPuesto,
+    'id': idEmpleado,
+    'id_departamento': idDepartamento,
+  };
+
+  @override
+  String toString() => json.encode(toJson());
 }
+

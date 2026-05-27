@@ -7,7 +7,6 @@
 // Versión   : 1.0.0
 // Descripción: Repositorio de autenticación — RF-009, RF-010, RF-011, RF-012
 // =============================================================================
-
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/errors/app_exceptions.dart';
@@ -99,7 +98,6 @@ class AuthRepository {
 
   Future<void> _limpiarSesion() async {
     await _storage.delete(key: AppConfig.claveToken);
-    await _storage.delete(key: AppConfig.claveRefreshToken);
     await _storage.delete(key: AppConfig.claveUsuario);
     await _storage.delete(key: AppConfig.claveRol);
     AppLogger.info(_modulo, 'Sesión eliminada del almacenamiento seguro');
