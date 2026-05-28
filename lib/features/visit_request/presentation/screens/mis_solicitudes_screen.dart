@@ -18,6 +18,7 @@ import '../../../../core/widgets/loading_widget.dart';
 import '../../bloc/visit_request_bloc.dart';
 import '../../data/visit_request_repository.dart';
 import '../widgets/solicitud_card_widget.dart';
+import 'visit_detail_screen.dart';
 
 class MisSolicitudesScreen extends StatelessWidget {
   const MisSolicitudesScreen({super.key});
@@ -48,7 +49,6 @@ class _MisSolicitudesViewState extends State<_MisSolicitudesView> {
     'Pendiente',
     'Autorizada',
     'Rechazada',
-    'Cancelada',
   ];
 
   @override
@@ -146,11 +146,23 @@ class _MisSolicitudesViewState extends State<_MisSolicitudesView> {
                 }
 
                 if (state is MisSolicitudesLoaded) {
-                  if (state.solicitudes.isEmpty) {
-                    return const Center(
+                  final solicitudesFiltradas = _filtroEstado == null
+                      ? state.solicitudes
+                      : state.solicitudes
+                      .where(
+                        (solicitud) =>
+                    solicitud.estado.toLowerCase().trim() ==
+                        _filtroEstado!.toLowerCase().trim(),
+                  )
+                      .toList();
+
+                  if (solicitudesFiltradas.isEmpty) {
+                    return Center(
                       child: Text(
-                        'No tienes solicitudes registradas',
-                        style: TextStyle(
+                        _filtroEstado == null
+                            ? 'No tienes solicitudes registradas'
+                            : 'No tienes solicitudes $_filtroEstado',
+                        style: const TextStyle(
                           color: AppColors.neutralGrey,
                           fontSize: 14,
                         ),
@@ -160,11 +172,32 @@ class _MisSolicitudesViewState extends State<_MisSolicitudesView> {
 
                   return ListView.builder(
                     padding: const EdgeInsets.all(AppSpacing.md),
-                    itemCount: state.solicitudes.length,
+                    itemCount: solicitudesFiltradas.length,
                     itemBuilder: (context, index) {
+                      final solicitud = solicitudesFiltradas[index];
+
                       return SolicitudCardWidget(
-                        solicitud: state.solicitudes[index],
-                        onTap: () {},
+                        solicitud: solicitud,
+                        onTap: () {
+                          if (solicitud.idSolicitud == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('No se pudo abrir el detalle de la solicitud'),
+                                backgroundColor: AppColors.actionRed,
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => VisitDetailScreen(
+                                idSolicitud: solicitud.idSolicitud!,
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   );

@@ -10,4 +10,5 @@
 
 export 'bloc/notification_bloc.dart';
 export 'data/notification_model.dart';
-export 'data/notification_service.dart';
+export 'data/notification_datasource.dart';
+export 'data/notification_repository.dart';

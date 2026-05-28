@@ -5,7 +5,7 @@
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
 // Versión   : 1.0.0
-// Descripción: Modelo de notificaciones — RF-023, RF-019
+// Descripción: Modelo de notificaciones — RF-023
 // =============================================================================
 
 enum TipoNotificacion {
@@ -43,43 +43,121 @@ class NotificationModel {
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    final tipoTexto = json['tipo']?.toString() ?? '';
+    final mensajeTexto = json['mensaje']?.toString() ?? '';
+
     return NotificationModel(
-      id: json['id'] as String? ?? '',
-      tipo: _parseTipo(json['tipo'] as String? ?? ''),
-      titulo: json['titulo'] as String? ?? '',
-      mensaje: json['mensaje'] as String? ?? '',
-      fecha: DateTime.parse(
-        json['fecha'] as String? ?? DateTime.now().toIso8601String(),
-      ),
-      leida: json['leida'] as bool? ?? false,
-      idSolicitud: json['id_solicitud'] as int?,
-      folio: json['folio'] as String?,
-      nombreVisitante: json['nombre_visitante'] as String?,
+      id: json['id_notificaciones']?.toString() ??
+          json['id_notificacion']?.toString() ??
+          json['id']?.toString() ??
+          '',
+      tipo: _parseTipo(tipoTexto),
+      titulo: json['titulo']?.toString() ?? _generarTitulo(tipoTexto),
+      mensaje: mensajeTexto,
+      fecha: DateTime.tryParse(
+        json['fecha_creado']?.toString() ??
+            json['fecha_creacion']?.toString() ??
+            json['created_at']?.toString() ??
+            json['fecha']?.toString() ??
+            '',
+      ) ??
+          DateTime.now(),
+      leida: _toBool(json['leida']),
+      idSolicitud: _toNullableInt(json['id_solicitud']),
+      folio: json['folio']?.toString(),
+      nombreVisitante: json['nombre_visitante']?.toString(),
     );
   }
 
   static TipoNotificacion _parseTipo(String tipo) {
-    switch (tipo) {
+    final t = tipo.toLowerCase().trim();
+
+    switch (t) {
+      case 'autorizada':
       case 'solicitud_autorizada':
         return TipoNotificacion.solicitudAutorizada;
+
+      case 'rechazada':
+      case 'rechazado':
       case 'solicitud_rechazada':
         return TipoNotificacion.solicitudRechazada;
+
+      case 'cancelada':
+      case 'cancelado':
       case 'solicitud_cancelada':
         return TipoNotificacion.solicitudCancelada;
+
       case 'visitante_ingreso':
         return TipoNotificacion.visitanteIngreso;
+
       case 'visitante_llegada_tarde':
         return TipoNotificacion.visitanteLlegadaTarde;
+
       case 'permanencia_excedida':
         return TipoNotificacion.permanenciaExcedida;
+
       case 'qr_extendido':
         return TipoNotificacion.qrExtendido;
+
       default:
         return TipoNotificacion.nuevaSolicitudPendiente;
     }
   }
 
-  NotificationModel copyWith({bool? leida}) {
+  static String _generarTitulo(String tipo) {
+    final t = tipo.toLowerCase().trim();
+
+    switch (t) {
+      case 'autorizada':
+      case 'solicitud_autorizada':
+        return 'Solicitud autorizada';
+
+      case 'rechazada':
+      case 'rechazado':
+      case 'solicitud_rechazada':
+        return 'Solicitud rechazada';
+
+      case 'cancelada':
+      case 'cancelado':
+      case 'solicitud_cancelada':
+        return 'Solicitud cancelada';
+
+      case 'visitante_ingreso':
+        return 'Visitante registrado';
+
+      case 'visitante_llegada_tarde':
+        return 'Llegada fuera de horario';
+
+      case 'permanencia_excedida':
+        return 'Permanencia excedida';
+
+      case 'qr_extendido':
+        return 'QR extendido';
+
+      default:
+        return 'Nueva notificación';
+    }
+  }
+
+  static bool _toBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+
+    final text = value.toString().toLowerCase().trim();
+
+    return text == '1' || text == 'true' || text == 'si' || text == 'sí';
+  }
+
+  static int? _toNullableInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    return int.tryParse(value.toString());
+  }
+
+  NotificationModel copyWith({
+    bool? leida,
+  }) {
     return NotificationModel(
       id: id,
       tipo: tipo,

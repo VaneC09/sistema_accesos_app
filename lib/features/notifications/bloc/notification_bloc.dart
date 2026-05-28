@@ -11,9 +11,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../data/notification_model.dart';
+import '../data/notification_repository.dart';
+import '../../../core/errors/app_exceptions.dart';
 import '../../../core/errors/app_logger.dart';
 
 // ── Eventos ──────────────────────────────────────────────────────────────────
+
 abstract class NotificationEvent extends Equatable {
   const NotificationEvent();
 
@@ -21,10 +24,14 @@ abstract class NotificationEvent extends Equatable {
   List<Object?> get props => [];
 }
 
+class CargarNotificaciones extends NotificationEvent {}
+
 class NotificacionRecibida extends NotificationEvent {
   final NotificationModel notificacion;
 
-  const NotificacionRecibida({required this.notificacion});
+  const NotificacionRecibida({
+    required this.notificacion,
+  });
 
   @override
   List<Object?> get props => [notificacion];
@@ -33,7 +40,9 @@ class NotificacionRecibida extends NotificationEvent {
 class MarcarComoLeida extends NotificationEvent {
   final String idNotificacion;
 
-  const MarcarComoLeida({required this.idNotificacion});
+  const MarcarComoLeida({
+    required this.idNotificacion,
+  });
 
   @override
   List<Object?> get props => [idNotificacion];
@@ -42,6 +51,7 @@ class MarcarComoLeida extends NotificationEvent {
 class LimpiarNotificaciones extends NotificationEvent {}
 
 // ── Estados ──────────────────────────────────────────────────────────────────
+
 abstract class NotificationState extends Equatable {
   const NotificationState();
 
@@ -50,6 +60,8 @@ abstract class NotificationState extends Equatable {
 }
 
 class NotificationInitial extends NotificationState {}
+
+class NotificationLoading extends NotificationState {}
 
 class NotificacionesLoaded extends NotificationState {
   final List<NotificationModel> notificaciones;
@@ -64,23 +76,78 @@ class NotificacionesLoaded extends NotificationState {
   List<Object?> get props => [notificaciones, noLeidas];
 }
 
+class NotificationError extends NotificationState {
+  final String mensaje;
+
+  const NotificationError({
+    required this.mensaje,
+  });
+
+  @override
+  List<Object?> get props => [mensaje];
+}
+
 // ── Bloc ─────────────────────────────────────────────────────────────────────
+
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   static const String _modulo = 'NOTIFICATION_BLOC';
+
+  final NotificationRepository _repository;
   final List<NotificationModel> _notificaciones = [];
 
-  NotificationBloc() : super(NotificationInitial()) {
+  NotificationBloc({
+    NotificationRepository? repository,
+  })  : _repository = repository ?? NotificationRepository(),
+        super(NotificationInitial()) {
+    on<CargarNotificaciones>(_onCargarNotificaciones);
     on<NotificacionRecibida>(_onNotificacionRecibida);
     on<MarcarComoLeida>(_onMarcarComoLeida);
     on<LimpiarNotificaciones>(_onLimpiar);
+  }
+
+  Future<void> _onCargarNotificaciones(
+      CargarNotificaciones event,
+      Emitter<NotificationState> emit,
+      ) async {
+    emit(NotificationLoading());
+
+    try {
+      final notificaciones = await _repository.obtenerNotificaciones();
+
+      _notificaciones
+        ..clear()
+        ..addAll(notificaciones);
+
+      AppLogger.info(
+        _modulo,
+        'Notificaciones reales cargadas: ${_notificaciones.length}',
+      );
+
+      emit(NotificacionesLoaded(
+        notificaciones: List.from(_notificaciones),
+        noLeidas: _notificaciones.where((n) => !n.leida).length,
+      ));
+    } on AppException catch (e) {
+      emit(NotificationError(mensaje: e.mensaje));
+    } catch (e) {
+      AppLogger.error(_modulo, 'Error al cargar notificaciones: $e');
+      emit(const NotificationError(
+        mensaje: 'No fue posible obtener las notificaciones. Intente nuevamente',
+      ));
+    }
   }
 
   void _onNotificacionRecibida(
       NotificacionRecibida event,
       Emitter<NotificationState> emit,
       ) {
-    AppLogger.info(_modulo, 'Nueva notificación: ${event.notificacion.tipo}');
+    AppLogger.info(
+      _modulo,
+      'Nueva notificación recibida localmente: ${event.notificacion.tipo}',
+    );
+
     _notificaciones.insert(0, event.notificacion);
+
     emit(NotificacionesLoaded(
       notificaciones: List.from(_notificaciones),
       noLeidas: _notificaciones.where((n) => !n.leida).length,
@@ -94,8 +161,12 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     final index = _notificaciones.indexWhere(
           (n) => n.id == event.idNotificacion,
     );
+
     if (index != -1) {
-      _notificaciones[index] = _notificaciones[index].copyWith(leida: true);
+      _notificaciones[index] = _notificaciones[index].copyWith(
+        leida: true,
+      );
+
       emit(NotificacionesLoaded(
         notificaciones: List.from(_notificaciones),
         noLeidas: _notificaciones.where((n) => !n.leida).length,

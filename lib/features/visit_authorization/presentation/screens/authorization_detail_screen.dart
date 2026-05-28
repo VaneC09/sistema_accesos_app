@@ -86,7 +86,7 @@ class AuthorizationDetailScreen extends StatelessWidget {
                       ),
                       _InfoRow(
                         icono: Icons.person_outline_rounded,
-                        label: 'Anfitrión',
+                        label: 'Solicitante',
                         valor: solicitud.nombreAnfitrion,
                       ),
                       _InfoRow(
