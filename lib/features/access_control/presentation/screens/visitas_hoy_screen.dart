@@ -3,19 +3,20 @@
 // Archivo   : visitas_hoy_screen.dart
 // Módulo    : features/access_control/presentation/screens
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
-// Versión   : 1.0.0
-// Descripción: Pantalla de visitas del día para vigilante — RF-025
+// Fecha     : 2026-05-27
+// Versión   : 1.0.1
+// Descripción: Pantalla de visitas del día para vigilante — RF-025 (Fix Storage)
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/error_widget.dart';
 import '../../../../core/widgets/loading_widget.dart';
-import '../../../auth/bloc/auth_bloc.dart';
 import '../../bloc/access_control_bloc.dart';
 import '../../data/access_repository.dart';
 import '../widgets/visit_list_item_widget.dart';
@@ -25,23 +26,47 @@ class VisitasHoyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authState = context.read<AuthBloc>().state;
-    String telefono = '';
-    if (authState is AuthAuthenticated) {
-      telefono = authState.nombre;
-    }
-
     return BlocProvider(
       create: (_) => AccessControlBloc(
         repository: AccessRepository(),
-      )..add(CargarVisitasHoy(telefono: telefono)),
+      )..add(const CargarVisitasHoy(telefono: '')), // Se sobreescribe con el teléfono real en el initState del View
       child: const _VisitasHoyView(),
     );
   }
 }
 
-class _VisitasHoyView extends StatelessWidget {
+class _VisitasHoyView extends StatefulWidget {
   const _VisitasHoyView();
+
+  @override
+  State<_VisitasHoyView> createState() => _VisitasHoyViewState();
+}
+
+class _VisitasHoyViewState extends State<_VisitasHoyView> {
+  final _storage = const FlutterSecureStorage();
+  String _telefono = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarTelefonoYVisitas();
+  }
+
+  /// Recupera el teléfono almacenado localmente e inicia la carga de datos en el BLOC
+  Future<void> _cargarTelefonoYVisitas() async {
+    final tel = await _storage.read(key: AppConfig.claveTelefonoVigilante) ?? '';
+    if (mounted) {
+      setState(() {
+        _telefono = tel;
+      });
+      context.read<AccessControlBloc>().add(CargarVisitasHoy(telefono: tel));
+    }
+  }
+
+  /// Invoca la recarga de información utilizando el teléfono en memoria
+  void _recargar() {
+    context.read<AccessControlBloc>().add(CargarVisitasHoy(telefono: _telefono));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,16 +91,7 @@ class _VisitasHoyView extends StatelessWidget {
               Icons.refresh_rounded,
               color: AppColors.baseSurface,
             ),
-            onPressed: () {
-              final authState = context.read<AuthBloc>().state;
-              String telefono = '';
-              if (authState is AuthAuthenticated) {
-                telefono = authState.nombre;
-              }
-              context.read<AccessControlBloc>().add(
-                CargarVisitasHoy(telefono: telefono),
-              );
-            },
+            onPressed: _recargar,
           ),
         ],
       ),
@@ -90,16 +106,7 @@ class _VisitasHoyView extends StatelessWidget {
           if (state is AccessControlError) {
             return ErrorMessageWidget(
               mensaje: state.mensaje,
-              onReintentar: () {
-                final authState = context.read<AuthBloc>().state;
-                String telefono = '';
-                if (authState is AuthAuthenticated) {
-                  telefono = authState.nombre;
-                }
-                context.read<AccessControlBloc>().add(
-                  CargarVisitasHoy(telefono: telefono),
-                );
-              },
+              onReintentar: _recargar,
             );
           }
 

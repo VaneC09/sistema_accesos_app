@@ -7,64 +7,62 @@
 // Versión   : 1.0.0
 // Descripción: Modelos de control de acceso — RF-022, RF-025
 // =============================================================================
-
-// Resultado del escaneo de QR
+// 1. MODELO: RESULTADO DE ESCANEO QR
 class QrScanResultModel {
+  final int idQr;
   final String folio;
   final String nombreVisitante;
-  final String lugarDestino;
-  final String estado;
-  final String tipoAcceso; // 'entrada' o 'salida'
+  final String correoVisitante;
+  final String motivoVisita;
+  final String vigenciaInicio;
+  final String vigenciaFin;
+  final String accionDisponible; // 'entrada' o 'salida'
   final bool accesoConcedido;
   final String? motivoRechazo;
-  final DateTime? horaToleranciaInicio;
-  final DateTime? horaToleranciaFin;
-  final bool llegaTarde;
-  final bool llegaAnticiapdo;
 
   const QrScanResultModel({
+    required this.idQr,
     required this.folio,
     required this.nombreVisitante,
-    required this.lugarDestino,
-    required this.estado,
-    required this.tipoAcceso,
+    required this.correoVisitante,
+    required this.motivoVisita,
+    required this.vigenciaInicio,
+    required this.vigenciaFin,
+    required this.accionDisponible,
     required this.accesoConcedido,
     this.motivoRechazo,
-    this.horaToleranciaInicio,
-    this.horaToleranciaFin,
-    this.llegaTarde = false,
-    this.llegaAnticiapdo = false,
   });
-  factory QrScanResultModel.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? json;
-    final sv = data['solicitud_visitante'] as Map<String, dynamic>?;
-    final visitante = sv?['visitante'] as Map<String, dynamic>?;
-    final solicitud = sv?['solicitud'] as Map<String, dynamic>?;
 
-    final nombre = visitante != null
-        ? '${visitante['nombre']} ${visitante['apellidos']}'
-        : '';
-    final lugar = solicitud?['lugar_encuentro'] as String? ?? '';
-    final idQr = data['id_qr'] as int? ?? 0;
+  // Getters para mantener compatibilidad con código/vistas anteriores
+  String get tipoAcceso => accionDisponible;
+  bool get llegaTarde => false;
+  bool get llegaAnticipado => false;
+
+  factory QrScanResultModel.fromJson(Map<String, dynamic> json) {
+    final data      = json['data'] as Map<String, dynamic>? ?? json;
+    final visitante = data['visitante']  as Map<String, dynamic>? ?? {};
+    final solicitud = data['solicitud']  as Map<String, dynamic>? ?? {};
 
     return QrScanResultModel(
-      folio: 'VIS-${idQr.toString().padLeft(8, '0')}',
-      nombreVisitante: nombre,
-      lugarDestino: lugar,
-      estado: 'Autorizada',
-      tipoAcceso: 'entrada',
-      accesoConcedido: true,
-      llegaTarde: false,
-      llegaAnticiapdo: false,
+      idQr:              data['id_qr']               as int?    ?? 0,
+      folio:             'QR-${data['id_qr'] ?? 0}',
+      nombreVisitante:   '${visitante['nombre'] ?? ''} ${visitante['apellidos'] ?? ''}'.trim(),
+      correoVisitante:   visitante['correo_personal'] as String? ?? '',
+      motivoVisita:      solicitud['motivo_visita']   as String? ?? '',
+      vigenciaInicio:    solicitud['vigencia_inicio'] as String? ?? '',
+      vigenciaFin:       solicitud['vigencia_final']  as String? ?? '',
+      accionDisponible:  data['accion_disponible']    as String? ?? 'entrada',
+      accesoConcedido:   data['acceso_concedido']     as bool?   ?? true,
+      motivoRechazo:     data['motivo_rechazo']       as String?,
     );
   }
 }
 
-// Modelo de visita del día para el vigilante
+// 2. MODELO: VISITA DEL DÍA PARA EL VIGILANTE
 class VisitaHoyModel {
   final String folio;
   final String nombreVisitante;
-  final String lugarDestino;
+  final String motivoVisita; // Antes era lugarDestino, adaptado al nuevo flujo
   final String tipoVisita;
   final DateTime horaVisita;
   final String estado;
@@ -74,7 +72,7 @@ class VisitaHoyModel {
   const VisitaHoyModel({
     required this.folio,
     required this.nombreVisitante,
-    required this.lugarDestino,
+    required this.motivoVisita,
     required this.tipoVisita,
     required this.horaVisita,
     required this.estado,
@@ -83,22 +81,34 @@ class VisitaHoyModel {
   });
 
   factory VisitaHoyModel.fromJson(Map<String, dynamic> json) {
+    // Laravel manda 'visitantes' como lista; tomamos el primero
+    final visitantes = json['visitantes'] as List<dynamic>? ?? [];
+    final primerVisitante = visitantes.isNotEmpty
+        ? visitantes.first as Map<String, dynamic>
+        : <String, dynamic>{};
+
+    final nombre = primerVisitante.isNotEmpty
+        ? '${primerVisitante['nombre']} ${primerVisitante['apellidos']}'.trim()
+        : 'Sin nombre';
+
+    final estado = json['estado'] as String? ?? 'autorizada';
+
     return VisitaHoyModel(
-      folio: json['folio'] as String? ?? '',
-      nombreVisitante: json['nombre_visitante'] as String? ?? '',
-      lugarDestino: json['lugar_destino'] as String? ?? '',
-      tipoVisita: json['tipo_visita'] as String? ?? '',
-      horaVisita: DateTime.parse(
-        json['hora_visita'] as String? ?? DateTime.now().toIso8601String(),
-      ),
-      estado: json['estado'] as String? ?? '',
-      entradaRegistrada: json['entrada_registrada'] as bool? ?? false,
-      salidaRegistrada: json['salida_registrada'] as bool? ?? false,
+      folio:             json['folio']           as String? ?? '',
+      nombreVisitante:   nombre,
+      motivoVisita:      json['lugar_encuentro'] as String? ?? '', // ← fix
+      tipoVisita:        'Visita',                                   // fijo, Laravel no lo manda
+      horaVisita: DateTime.tryParse(
+        json['hora_inicio'] as String? ?? '',                        // ← fix
+      ) ?? DateTime.now(),
+      estado:            estado,
+      entradaRegistrada: estado == 'dentro' || estado == 'salio',   // ← derivado
+      salidaRegistrada:  estado == 'salio',                          // ← derivado
     );
   }
 }
 
-// Modelo para registro manual
+// 3. MODELO: REGISTRO MANUAL
 class RegistroManualModel {
   final String codigoNumerico;
   final String telefono;

@@ -9,9 +9,15 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_strings.dart';
+
+import '../../../auth/bloc/auth_bloc.dart';
+
+import '../../bloc/access_control_bloc.dart';
 import '../../data/access_model.dart';
 
 class QrResultWidget extends StatelessWidget {
@@ -28,6 +34,8 @@ class QrResultWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool esEntrada = resultado.accionDisponible == 'entrada';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -45,7 +53,7 @@ class QrResultWidget extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Icono de resultado
+          // Icono de validación de estatus de acceso
           Icon(
             resultado.accesoConcedido
                 ? Icons.check_circle_rounded
@@ -84,9 +92,9 @@ class QrResultWidget extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
 
-          // Lugar destino — mínimo 18pt según RNF-03
+          // Motivo de la visita (Reemplaza a lugarDestino) — mínimo 18pt según RNF-03
           Text(
-            resultado.lugarDestino,
+            resultado.motivoVisita,
             style: const TextStyle(
               fontSize: 18,
               color: AppColors.steelBlue,
@@ -95,7 +103,7 @@ class QrResultWidget extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
 
-          // Folio
+          // Folio numérico del QR
           Text(
             'Folio: ${resultado.folio}',
             style: const TextStyle(
@@ -103,24 +111,25 @@ class QrResultWidget extends StatelessWidget {
               color: AppColors.neutralGrey,
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
 
-          // Tipo de acceso
+          // Badge indicador del flujo de acción sugerido
           Container(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.xs,
             ),
             decoration: BoxDecoration(
-              color: resultado.tipoAcceso == 'entrada'
+              color: esEntrada
                   ? AppColors.headingSky
                   : AppColors.subtleWarm,
-              borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+              borderRadius:
+              BorderRadius.circular(AppSpacing.radiusPill),
             ),
             child: Text(
-              resultado.tipoAcceso == 'entrada'
-                  ? 'ENTRADA'
-                  : 'SALIDA',
+              esEntrada
+                  ? 'ENTRADA SUGERIDA'
+                  : 'SALIDA SUGERIDA',
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -129,25 +138,29 @@ class QrResultWidget extends StatelessWidget {
             ),
           ),
 
-          // Mensaje si llega tarde
+          // Alerta visual si llega tarde
           if (resultado.llegaTarde) ...[
             const SizedBox(height: AppSpacing.md),
+
             Container(
               padding: const EdgeInsets.all(AppSpacing.sm),
               decoration: BoxDecoration(
                 color: AppColors.warningOrange.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+                borderRadius:
+                BorderRadius.circular(AppSpacing.radiusSmall),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.warning_amber_rounded,
                     color: AppColors.primaryCoral,
                     size: 20,
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  const Text(
+
+                  SizedBox(width: AppSpacing.sm),
+
+                  Text(
                     AppStrings.accesoFueraHorario,
                     style: TextStyle(
                       color: AppColors.primaryCoral,
@@ -158,8 +171,10 @@ class QrResultWidget extends StatelessWidget {
                 ],
               ),
             ),
+
             if (onExtenderTiempo != null) ...[
               const SizedBox(height: AppSpacing.sm),
+
               TextButton.icon(
                 onPressed: onExtenderTiempo,
                 icon: const Icon(
@@ -168,16 +183,19 @@ class QrResultWidget extends StatelessWidget {
                 ),
                 label: const Text(
                   'Notificar al anfitrión para extender tiempo',
-                  style: TextStyle(color: AppColors.primaryCoral),
+                  style: TextStyle(
+                    color: AppColors.primaryCoral,
+                  ),
                 ),
               ),
             ],
           ],
 
-          // Motivo de rechazo
+          // Detalle del motivo de rechazo si aplica
           if (!resultado.accesoConcedido &&
               resultado.motivoRechazo != null) ...[
             const SizedBox(height: AppSpacing.md),
+
             Text(
               resultado.motivoRechazo!,
               style: const TextStyle(
@@ -188,19 +206,109 @@ class QrResultWidget extends StatelessWidget {
             ),
           ],
 
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.xl),
 
-          // Botón nuevo escaneo
+          // ── SECCIÓN DE BOTONES DE ACCIÓN DEFINITIVA ────────────────────────
+          if (resultado.accesoConcedido) ...[
+            Builder(
+              builder: (context) {
+                // Leemos las credenciales reales del AuthBloc activas en el árbol
+                final authState = context.read<AuthBloc>().state;
+
+                String txtTelefono = '';
+                String txtArea = '';
+
+                if (authState is AuthAuthenticated) {
+                  txtTelefono = authState.correoPersonal;
+                  txtArea = authState.correoPuesto;
+                }
+
+                return SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: esEntrada
+                      ? ElevatedButton.icon(
+                    onPressed: () => context
+                        .read<AccessControlBloc>()
+                        .add(
+                      RegistrarEntrada(
+                        idQr: resultado.idQr,
+                        telefono: txtTelefono,
+                        area: txtArea,
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.login_rounded,
+                      color: Colors.white,
+                    ),
+                    label: const Text(
+                      'Registrar Entrada',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                      AppColors.primaryCoral,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMedium,
+                        ),
+                      ),
+                    ),
+                  )
+                      : ElevatedButton.icon(
+                    onPressed: () => context
+                        .read<AccessControlBloc>()
+                        .add(
+                      RegistrarSalida(
+                        idQr: resultado.idQr,
+                        telefono: txtTelefono,
+                        area: txtArea,
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.logout_rounded,
+                      color: Colors.white,
+                    ),
+                    label: const Text(
+                      'Registrar Salida',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                      AppColors.headingDark,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMedium,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: AppSpacing.md),
+          ],
+
+          // Botón secundario para volver a escanear
           if (onNuevoEscaneo != null)
             TextButton.icon(
               onPressed: onNuevoEscaneo,
               icon: const Icon(
                 Icons.qr_code_scanner_rounded,
-                color: AppColors.headingDark,
+                color: AppColors.neutralGrey,
               ),
               label: const Text(
-                'Nuevo escaneo',
-                style: TextStyle(color: AppColors.headingDark),
+                'Cancelar / Nuevo escaneo',
+                style: TextStyle(
+                  color: AppColors.neutralGrey,
+                ),
               ),
             ),
         ],

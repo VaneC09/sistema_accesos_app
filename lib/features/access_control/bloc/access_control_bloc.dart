@@ -3,9 +3,9 @@
 // Archivo   : access_control_bloc.dart
 // Módulo    : features/access_control/bloc
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
-// Versión   : 1.0.0
-// Descripción: Gestor de estado de control de acceso — RF-022, RF-025
+// Fecha     : 2026-05-27
+// Versión   : 1.1.0
+// Descripción: Gestor de estado de control de acceso con flujos de confirmación — RF-022, RF-025
 // =============================================================================
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -65,6 +65,30 @@ class CargarVisitasHoy extends AccessControlEvent {
 
 class ResetAcceso extends AccessControlEvent {}
 
+/// Evento para registrar explícitamente la entrada de la visita
+class RegistrarEntrada extends AccessControlEvent {
+  final int idQr;
+  final String telefono;
+  final String area;
+
+  const RegistrarEntrada({required this.idQr, required this.telefono, required this.area});
+
+  @override
+  List<Object?> get props => [idQr, telefono, area];
+}
+
+/// Evento para registrar explícitamente la salida de la visita
+class RegistrarSalida extends AccessControlEvent {
+  final int idQr;
+  final String telefono;
+  final String area;
+
+  const RegistrarSalida({required this.idQr, required this.telefono, required this.area});
+
+  @override
+  List<Object?> get props => [idQr, telefono, area];
+}
+
 // ── Estados ──────────────────────────────────────────────────────────────────
 abstract class AccessControlState extends Equatable {
   const AccessControlState();
@@ -104,6 +128,17 @@ class AccessControlError extends AccessControlState {
   List<Object?> get props => [mensaje];
 }
 
+/// Estado emitido cuando el backend procesa exitosamente la entrada o la salida
+class AccesoRegistrado extends AccessControlState {
+  final String mensaje;
+  final String tipo; // 'entrada' o 'salida'
+
+  const AccesoRegistrado({required this.mensaje, required this.tipo});
+
+  @override
+  List<Object?> get props => [mensaje, tipo];
+}
+
 // ── Bloc ─────────────────────────────────────────────────────────────────────
 class AccessControlBloc extends Bloc<AccessControlEvent, AccessControlState> {
   static const String _modulo = 'ACCESS_CONTROL_BLOC';
@@ -116,6 +151,8 @@ class AccessControlBloc extends Bloc<AccessControlEvent, AccessControlState> {
     on<RegistroManual>(_onRegistroManual);
     on<CargarVisitasHoy>(_onCargarVisitasHoy);
     on<ResetAcceso>(_onReset);
+    on<RegistrarEntrada>(_onRegistrarEntrada);
+    on<RegistrarSalida>(_onRegistrarSalida);
   }
 
   Future<void> _onEscanearQr(
@@ -215,5 +252,45 @@ class AccessControlBloc extends Bloc<AccessControlEvent, AccessControlState> {
       Emitter<AccessControlState> emit,
       ) {
     emit(AccessControlInitial());
+  }
+
+  Future<void> _onRegistrarEntrada(
+      RegistrarEntrada event,
+      Emitter<AccessControlState> emit,
+      ) async {
+    try {
+      emit(AccessControlLoading());
+      await _repository.registrarEntrada(
+        idQr: event.idQr,
+        telefono: event.telefono,
+        area: event.area,
+      );
+      AppLogger.info(_modulo, 'Entrada registrada — id_qr: ${event.idQr}');
+      emit(const AccesoRegistrado(mensaje: 'Entrada registrada correctamente', tipo: 'entrada'));
+    } on AppException catch (e) {
+      emit(AccessControlError(mensaje: e.mensaje));
+    } catch (e) {
+      emit(const AccessControlError(mensaje: 'No fue posible registrar la entrada'));
+    }
+  }
+
+  Future<void> _onRegistrarSalida(
+      RegistrarSalida event,
+      Emitter<AccessControlState> emit,
+      ) async {
+    try {
+      emit(AccessControlLoading());
+      await _repository.registrarSalida(
+        idQr: event.idQr,
+        telefono: event.telefono,
+        area: event.area,
+      );
+      AppLogger.info(_modulo, 'Salida registrada — id_qr: ${event.idQr}');
+      emit(const AccesoRegistrado(mensaje: 'Salida registrada correctamente', tipo: 'salida'));
+    } on AppException catch (e) {
+      emit(AccessControlError(mensaje: e.mensaje));
+    } catch (e) {
+      emit(const AccessControlError(mensaje: 'No fue posible registrar la salida'));
+    }
   }
 }

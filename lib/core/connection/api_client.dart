@@ -169,6 +169,10 @@ class ApiClient {
         return const NotFoundException(
           mensaje: 'Recurso no encontrado',
         );
+      case 422:
+        return const ValidationException(
+          mensaje: 'Datos incorrectos. Verifique la información',
+        );
       default:
         AppLogger.error(_modulo, 'Error servidor: $codigo');
         return const ServerException(

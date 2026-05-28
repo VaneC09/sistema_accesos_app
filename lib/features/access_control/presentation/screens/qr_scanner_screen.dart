@@ -4,8 +4,8 @@
 // Módulo    : features/access_control/presentation/screens
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
-// Versión   : 1.0.0
-// Descripción: Pantalla de escaneo QR para vigilante — RF-022
+// Versión   : 1.0.2
+// Descripción: Pantalla de escaneo QR para vigilante — RF-022 (Mapeo de Auth Corregido)
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -60,17 +60,13 @@ class _QrScannerViewState extends State<_QrScannerView> {
 
   String _obtenerTelefono(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
-    if (authState is AuthAuthenticated) {
-      return authState.nombre;
-    }
+    if (authState is AuthAuthenticated) return authState.correoPersonal;
     return '';
   }
 
   String _obtenerArea(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
-    if (authState is AuthAuthenticated) {
-      return authState.nombre;
-    }
+    if (authState is AuthAuthenticated) return authState.correoPuesto;
     return '';
   }
 
@@ -135,7 +131,7 @@ class _QrScannerViewState extends State<_QrScannerView> {
       body: BlocBuilder<AccessControlBloc, AccessControlState>(
         builder: (context, state) {
           if (state is AccessControlLoading) {
-            return const LoadingWidget(mensaje: 'Validando QR...');
+            return const LoadingWidget(mensaje: 'Validando acceso...');
           }
 
           if (state is QrEscaneadoSuccess) {
@@ -190,10 +186,8 @@ class _QrScannerViewState extends State<_QrScannerView> {
             );
           }
 
-          // Vista de escaneo
           return Column(
             children: [
-              // Área del escáner
               Expanded(
                 flex: 3,
                 child: Stack(
@@ -203,7 +197,6 @@ class _QrScannerViewState extends State<_QrScannerView> {
                       onDetect: (capture) =>
                           _onQrDetectado(context, capture),
                     ),
-                    // Marco de escaneo
                     Center(
                       child: Container(
                         width: 250,
@@ -222,8 +215,6 @@ class _QrScannerViewState extends State<_QrScannerView> {
                   ],
                 ),
               ),
-
-              // Instrucciones y botón manual
               Expanded(
                 flex: 1,
                 child: Container(

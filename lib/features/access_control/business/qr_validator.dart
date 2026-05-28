@@ -14,23 +14,26 @@ class QrValidator {
   QrValidator._();
 
   static void validarCodigoQr(String codigo) {
-    if (codigo.trim().isEmpty) {
+    final limpio = codigo.trim().toUpperCase();
+    if (limpio.isEmpty) {
+      throw const ValidationException(mensaje: 'Código QR vacío');
+    }
+    if (!RegExp(r'^VIS-[A-Z0-9]{4}-[A-Z0-9]{4}$').hasMatch(limpio)) {
       throw const ValidationException(
-        mensaje: 'El código QR no puede estar vacío',
+        mensaje: 'El código QR no es válido para este sistema',
       );
     }
   }
 
   static void validarCodigoNumerico(String codigo) {
-    if (codigo.trim().isEmpty) {
-      throw const ValidationException(
-        mensaje: 'Ingrese el código de 8 caracteres',
-      );
+    final limpio = codigo.trim().toUpperCase();
+    if (limpio.isEmpty) {
+      throw const ValidationException(mensaje: 'Ingresa el código QR');
     }
-
-    if (codigo.trim().length != 8) {
+    // Acepta VIS-XXXX-XXXX (ya ensamblado por el dialog)
+    if (!RegExp(r'^VIS-[A-Z0-9]{4}-[A-Z0-9]{4}$').hasMatch(limpio)) {
       throw const ValidationException(
-        mensaje: 'El código debe tener exactamente 8 caracteres',
+        mensaje: 'Formato inválido. Ejemplo: VIS-0491-6013',
       );
     }
   }

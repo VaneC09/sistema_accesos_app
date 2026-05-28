@@ -74,7 +74,7 @@ class VisitListItemWidget extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    visita.lugarDestino,
+                    visita.motivoVisita,
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppColors.steelBlue,

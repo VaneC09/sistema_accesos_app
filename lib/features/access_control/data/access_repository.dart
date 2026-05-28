@@ -3,9 +3,9 @@
 // Archivo   : access_repository.dart
 // Módulo    : features/access_control/data
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
-// Versión   : 1.0.0
-// Descripción: Repositorio de control de acceso — RF-022, RF-025
+// Fecha     : 2026-05-27
+// Versión   : 1.2.1
+// Descripción: Repositorio de control de acceso funcional y limpio — RF-022, RF-025
 // =============================================================================
 
 import '../../../core/errors/app_exceptions.dart';
@@ -20,7 +20,9 @@ class AccessRepository {
   AccessRepository({AccessDatasource? datasource})
       : _datasource = datasource ?? AccessDatasource();
 
-  // Escanear QR
+  // ── Métodos de Inspección Inicial ─────────────────────────────────────────
+
+  /// Escanear QR para consultar datos del visitante
   Future<QrScanResultModel> escanearQr({
     required String codigoQr,
     required String telefono,
@@ -42,7 +44,7 @@ class AccessRepository {
     }
   }
 
-  // Registro manual
+  /// Registro manual usando código numérico
   Future<QrScanResultModel> registroManual({
     required String codigoNumerico,
     required String telefono,
@@ -64,7 +66,7 @@ class AccessRepository {
     }
   }
 
-  // Obtener visitas del día
+  /// Obtener visitas del día para el Home del vigilante
   Future<List<VisitaHoyModel>> obtenerVisitasHoy({
     required String telefono,
   }) async {
@@ -76,6 +78,52 @@ class AccessRepository {
       AppLogger.error(_modulo, 'Error al obtener visitas: $e');
       throw const ServerException(
         mensaje: 'No fue posible obtener las visitas. Intente nuevamente',
+      );
+    }
+  }
+
+  // ── Métodos de Confirmación de Flujo (Entrada / Salida) ────────────────────
+
+  /// Registra la Entrada definitiva usando los parámetros del vigilante activo
+  Future<void> registrarEntrada({
+    required int idQr,
+    required String telefono,
+    required String area,
+  }) async {
+    try {
+      await _datasource.registrarEntrada(
+        idQr: idQr,
+        telefono: telefono,
+        area: area,
+      );
+    } on AppException {
+      rethrow;
+    } catch (e) {
+      AppLogger.error(_modulo, 'Error al registrar entrada: $e');
+      throw const ServerException(
+        mensaje: 'No fue posible registrar la entrada',
+      );
+    }
+  }
+
+  /// Registra la Salida definitiva usando los parámetros del vigilante activo
+  Future<void> registrarSalida({
+    required int idQr,
+    required String telefono,
+    required String area,
+  }) async {
+    try {
+      await _datasource.registrarSalida(
+        idQr: idQr,
+        telefono: telefono,
+        area: area,
+      );
+    } on AppException {
+      rethrow;
+    } catch (e) {
+      AppLogger.error(_modulo, 'Error al registrar salida: $e');
+      throw const ServerException(
+        mensaje: 'No fue posible registrar la salida',
       );
     }
   }

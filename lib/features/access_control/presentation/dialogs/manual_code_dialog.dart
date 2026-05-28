@@ -7,21 +7,18 @@
 // Versión   : 1.0.0
 // Descripción: Diálogo para ingreso manual de código — RF-039, RF-033
 // =============================================================================
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
-import '../../../../core/constants/app_strings.dart';
-import '../../../../core/widgets/primary_button_widget.dart';
 
 class ManualCodeDialog extends StatefulWidget {
-  const ManualCodeDialog({super.key});
+  const ManualCodeDialog._();
 
   static Future<String?> mostrar(BuildContext context) {
     return showDialog<String>(
       context: context,
-      builder: (_) => const ManualCodeDialog(),
+      builder: (_) => const ManualCodeDialog._(),
     );
   }
 
@@ -30,88 +27,155 @@ class ManualCodeDialog extends StatefulWidget {
 }
 
 class _ManualCodeDialogState extends State<ManualCodeDialog> {
-  final _codigoController = TextEditingController();
+  final _controller = TextEditingController();
   String? _error;
 
   @override
   void dispose() {
-    _codigoController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _onConfirmar() {
-    final codigo = _codigoController.text.trim();
-    if (codigo.length != 8) {
-      setState(() => _error = 'El código debe tener exactamente 8 dígitos');
+  void _confirmar() {
+    final valor = _controller.text.trim().toUpperCase();
+
+    // Validar: exactamente 8 caracteres alfanuméricos (sin los guiones del prefijo)
+    if (valor.isEmpty) {
+      setState(() => _error = 'Ingresa el código');
       return;
     }
-    if (!RegExp(r'^[0-9]+$').hasMatch(codigo)) {
-      setState(() => _error = 'El código solo debe contener dígitos numéricos');
+    if (valor.length != 9 || !valor.contains('-')) {
+      // Aceptar con o sin guión intermedio: "04916013" o "0491-6013"
+    }
+
+    // Ensamblar formato VIS-XXXX-XXXX
+    final limpio = valor.replaceAll('-', '');
+    if (limpio.length != 8) {
+      setState(() => _error = 'El código debe tener 8 caracteres');
       return;
     }
-    Navigator.pop(context, codigo);
+
+    final codigoCompleto =
+        'VIS-${limpio.substring(0, 4)}-${limpio.substring(4, 8)}';
+    Navigator.of(context).pop(codigoCompleto);
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppColors.baseSurface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
-      ),
-      title: const Text(
-        'Ingreso manual',
-        style: TextStyle(
-          color: AppColors.deepNavy,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Ingresa el código numérico de 8 dígitos del pase QR\n'
-                  '(Ejemplo: si el código es VIS-0491-6013, ingresa 04916013)',
-              style: TextStyle(color: AppColors.onyxGrey, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _codigoController,
-              keyboardType: TextInputType.number,
-              maxLength: 8,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 8,
-                color: AppColors.deepNavy,
+      title: const Text('Ingresar código QR'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Escribe los 8 caracteres del código',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          // Prefijo VIS- fijo + campo de texto
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Prefijo fijo no editable
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.headingDark.withOpacity(0.08),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
+                  ),
+                  border: Border.all(
+                    color: AppColors.headingDark.withOpacity(0.3),
+                  ),
+                ),
+                child: const Text(
+                  'VIS-',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2,
+                  ),
+                ),
               ),
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                counterText: '',
-                hintText: '04916013',
-                errorText: _error,
+              // Campo editable: solo los 8 caracteres restantes
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  maxLength: 9, // permite "XXXX-XXXX" con guión opcional
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'[A-Z0-9\-]'),
+                    ),
+                  ],
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 2,
+                  ),
+                  decoration: InputDecoration(
+                    counterText: '',
+                    hintText: '0000-0000',
+                    errorText: _error,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                    border: const OutlineInputBorder(
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                      borderSide: BorderSide(
+                        color: AppColors.headingDark.withOpacity(0.3),
+                      ),
+                    ),
+                  ),
+                  onChanged: (_) => setState(() => _error = null),
+                  onSubmitted: (_) => _confirmar(),
+                ),
               ),
-              onChanged: (_) {
-                if (_error != null) setState(() => _error = null);
-              },
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Ejemplo: VIS-0491-6013',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade500,
+              fontStyle: FontStyle.italic,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text(
-            AppStrings.botonCancelar,
-            style: TextStyle(color: AppColors.headingDark),
-          ),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
         ),
-        PrimaryButtonWidget(
-          texto: AppStrings.botonAceptar,
-          onPressed: _onConfirmar,
+        ElevatedButton(
+          onPressed: _confirmar,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primaryCoral,
+          ),
+          child: const Text(
+            'Verificar',
+            style: TextStyle(color: Colors.white),
+          ),
         ),
       ],
     );
