@@ -28,34 +28,45 @@ class VisitRequestScreen extends StatefulWidget {
 
 class _VisitRequestScreenState extends State<VisitRequestScreen> {
   final _formKey = GlobalKey<FormState>();
+
   final _lugarController = TextEditingController();
   final _motivoController = TextEditingController();
 
   bool _esGrupal = false;
   DateTime? _fechaVisita;
   TimeOfDay? _horaVisita;
+
   int _toleranciaAntes = 15;
   int _toleranciaDespues = 15;
+
   String _tipoVisita = 'Personal';
 
   // Visitante individual
   final _nombreController = TextEditingController();
+  final _apellidosController = TextEditingController();
   final _correoController = TextEditingController();
 
   // Visitantes grupales
   final List<Map<String, TextEditingController>> _visitantesGrupales = [];
-  final List<int> _tolerancias = [5, 10, 15, 20, 30, 45, 60];
+
+  // Laravel solo acepta 15 y 30
+  final List<int> _tolerancias = [15, 30];
 
   @override
   void dispose() {
     _lugarController.dispose();
     _motivoController.dispose();
+
     _nombreController.dispose();
+    _apellidosController.dispose();
     _correoController.dispose();
-    for (final v in _visitantesGrupales) {
-      v['nombre']!.dispose();
-      v['correo']!.dispose();
+
+    for (final visitante in _visitantesGrupales) {
+      visitante['nombre']!.dispose();
+      visitante['apellidos']!.dispose();
+      visitante['correo']!.dispose();
     }
+
     super.dispose();
   }
 
@@ -63,6 +74,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
     setState(() {
       _visitantesGrupales.add({
         'nombre': TextEditingController(),
+        'apellidos': TextEditingController(),
         'correo': TextEditingController(),
       });
     });
@@ -71,6 +83,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
   void _eliminarVisitante(int index) {
     setState(() {
       _visitantesGrupales[index]['nombre']!.dispose();
+      _visitantesGrupales[index]['apellidos']!.dispose();
       _visitantesGrupales[index]['correo']!.dispose();
       _visitantesGrupales.removeAt(index);
     });
@@ -83,7 +96,10 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (fecha != null) setState(() => _fechaVisita = fecha);
+
+    if (fecha != null) {
+      setState(() => _fechaVisita = fecha);
+    }
   }
 
   Future<void> _seleccionarHora() async {
@@ -91,7 +107,10 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
       context: context,
       initialTime: TimeOfDay.now(),
     );
-    if (hora != null) setState(() => _horaVisita = hora);
+
+    if (hora != null) {
+      setState(() => _horaVisita = hora);
+    }
   }
 
   void _onEnviarSolicitud() {
@@ -115,11 +134,12 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
       _horaVisita!.minute,
     );
 
-    // Validar que la fecha no sea pasada
     if (fechaCompleta.isBefore(DateTime.now())) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('La fecha y hora de visita no puede ser anterior a la actual'),
+          content: Text(
+            'La fecha y hora de visita no puede ser anterior a la actual',
+          ),
           backgroundColor: AppColors.actionRed,
         ),
       );
@@ -138,15 +158,19 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
         );
         return;
       }
+
       visitantes = _visitantesGrupales
-          .map((v) => VisitanteModel(
-        nombre: v['nombre']!.text.trim(),
-        correo: v['correo']!.text.trim(),
-      ))
+          .map(
+            (v) => VisitanteModel(
+          nombre: v['nombre']!.text.trim(),
+          apellidos: v['apellidos']!.text.trim(),
+          correo: v['correo']!.text.trim(),
+        ),
+      )
           .toList();
 
-      // Validar correos duplicados
       final correos = visitantes.map((v) => v.correo).toList();
+
       if (correos.toSet().length != correos.length) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -160,6 +184,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
       visitantes = [
         VisitanteModel(
           nombre: _nombreController.text.trim(),
+          apellidos: _apellidosController.text.trim(),
           correo: _correoController.text.trim(),
         ),
       ];
@@ -254,14 +279,26 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         prefixIcon: Icon(Icons.category_outlined),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'Proveedor', child: Text('Proveedor')),
-                        DropdownMenuItem(value: 'Institucional / Negocios', child: Text('Institucional / Negocios')),
-                        DropdownMenuItem(value: 'Personal', child: Text('Personal')),
+                        DropdownMenuItem(
+                          value: 'Proveedor',
+                          child: Text('Proveedor'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Institucional / Negocios',
+                          child: Text('Institucional / Negocios'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Personal',
+                          child: Text('Personal'),
+                        ),
                       ],
-                      onChanged: (value) => setState(() => _tipoVisita = value ?? 'Personal'),
+                      onChanged: (value) {
+                        setState(() => _tipoVisita = value ?? 'Personal');
+                      },
                     ),
-                    const SizedBox(height: AppSpacing.md), // Espaciado recomendado para mantener el diseño
-                    // Switch grupal
+
+                    const SizedBox(height: AppSpacing.md),
+
                     Row(
                       children: [
                         Switch(
@@ -270,6 +307,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                           onChanged: (value) {
                             setState(() {
                               _esGrupal = value;
+
                               if (value && _visitantesGrupales.isEmpty) {
                                 _agregarVisitante();
                               }
@@ -283,20 +321,19 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         ),
                       ],
                     ),
+
                     const SizedBox(height: AppSpacing.md),
 
-                    // Visitante individual
                     if (!_esGrupal) ...[
                       VisitanteFormWidget(
                         indice: 0,
                         nombreController: _nombreController,
-                        apellidosController: TextEditingController(),
+                        apellidosController: _apellidosController,
                         correoController: _correoController,
                         mostrarEliminar: false,
                       ),
                     ],
 
-                    // Visitantes grupales
                     if (_esGrupal) ...[
                       Text(
                         'Visitantes del grupo',
@@ -307,7 +344,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         return VisitanteFormWidget(
                           indice: entry.key,
                           nombreController: entry.value['nombre']!,
-                          apellidosController: TextEditingController(),
+                          apellidosController: entry.value['apellidos']!,
                           correoController: entry.value['correo']!,
                           onEliminar: () => _eliminarVisitante(entry.key),
                         );
@@ -324,9 +361,9 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         ),
                       ),
                     ],
+
                     const SizedBox(height: AppSpacing.md),
 
-                    // Lugar destino
                     TextFormField(
                       controller: _lugarController,
                       decoration: const InputDecoration(
@@ -340,9 +377,9 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         return null;
                       },
                     ),
+
                     const SizedBox(height: AppSpacing.md),
 
-                    // Fecha y hora
                     Row(
                       children: [
                         Expanded(
@@ -382,9 +419,9 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         ),
                       ],
                     ),
+
                     const SizedBox(height: AppSpacing.md),
 
-                    // Motivo
                     TextFormField(
                       controller: _motivoController,
                       maxLines: 3,
@@ -400,14 +437,16 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         return null;
                       },
                     ),
+
                     const SizedBox(height: AppSpacing.md),
 
-                    // Tolerancias
                     Text(
                       AppStrings.labelToleranciaLlegada,
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
+
                     const SizedBox(height: AppSpacing.sm),
+
                     Row(
                       children: [
                         Expanded(
@@ -424,13 +463,17 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                               DropdownButtonFormField<int>(
                                 value: _toleranciaAntes,
                                 items: _tolerancias
-                                    .map((t) => DropdownMenuItem(
-                                  value: t,
-                                  child: Text('$t min'),
-                                ))
+                                    .map(
+                                      (t) => DropdownMenuItem(
+                                    value: t,
+                                    child: Text('$t min'),
+                                  ),
+                                )
                                     .toList(),
                                 onChanged: (value) {
-                                  setState(() => _toleranciaAntes = value ?? 15);
+                                  setState(
+                                        () => _toleranciaAntes = value ?? 15,
+                                  );
                                 },
                               ),
                             ],
@@ -451,13 +494,17 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                               DropdownButtonFormField<int>(
                                 value: _toleranciaDespues,
                                 items: _tolerancias
-                                    .map((t) => DropdownMenuItem(
-                                  value: t,
-                                  child: Text('$t min'),
-                                ))
+                                    .map(
+                                      (t) => DropdownMenuItem(
+                                    value: t,
+                                    child: Text('$t min'),
+                                  ),
+                                )
                                     .toList(),
                                 onChanged: (value) {
-                                  setState(() => _toleranciaDespues = value ?? 15);
+                                  setState(
+                                        () => _toleranciaDespues = value ?? 15,
+                                  );
                                 },
                               ),
                             ],
@@ -465,9 +512,9 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
                         ),
                       ],
                     ),
+
                     const SizedBox(height: AppSpacing.xl),
 
-                    // Botón enviar
                     BlocBuilder<VisitRequestBloc, VisitRequestState>(
                       builder: (context, state) {
                         return PrimaryButtonWidget(

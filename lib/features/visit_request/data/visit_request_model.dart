@@ -20,9 +20,12 @@ class VisitanteModel {
 
   factory VisitanteModel.fromJson(Map<String, dynamic> json) {
     return VisitanteModel(
-      nombre: json['nombre'] as String? ?? '',
-      apellidos: json['apellidos'] as String? ?? '',
-      correo: json['correo_personal'] as String? ?? '',
+      nombre: json['nombre']?.toString() ?? '',
+      apellidos: json['apellidos']?.toString() ?? '',
+      correo: json['correo']?.toString() ??
+          json['correo_personal']?.toString() ??
+          json['email']?.toString() ??
+          '',
     );
   }
 
@@ -37,7 +40,7 @@ class VisitanteModel {
 
 class VisitRequestModel {
   final int? idSolicitud;
-  final String tipoVisita; // <-- NUEVO CAMPO
+  final String tipoVisita;
   final bool esGrupal;
   final List<VisitanteModel> visitantes;
   final String lugarDestino;
@@ -52,7 +55,7 @@ class VisitRequestModel {
 
   const VisitRequestModel({
     this.idSolicitud,
-    required this.tipoVisita, // <-- NUEVO CAMPO REQUERIDO
+    required this.tipoVisita,
     required this.esGrupal,
     required this.visitantes,
     required this.lugarDestino,
@@ -67,42 +70,91 @@ class VisitRequestModel {
   });
 
   factory VisitRequestModel.fromJson(Map<String, dynamic> json) {
+    final numeroVisitantes = _toInt(
+      json['numero_visitantes'],
+      defaultValue: 1,
+    );
+
+    final estadoId = _toInt(
+      json['id_estado_solicitud'],
+      defaultValue: 1,
+    );
+
+    String tipo = json['tipo_visita']?.toString() ?? '';
+
+    if (tipo.isEmpty && json['tipo'] is Map<String, dynamic>) {
+      final tipoJson = json['tipo'] as Map<String, dynamic>;
+      tipo = tipoJson['nombre']?.toString() ??
+          tipoJson['tipo']?.toString() ??
+          tipoJson['descripcion']?.toString() ??
+          '';
+    }
+
+    if (tipo.isEmpty) {
+      tipo = 'Personal';
+    }
+
     return VisitRequestModel(
-      idSolicitud: json['id_solicitud'] as int?,
-      tipoVisita: json['tipo_visita'] as String? ?? 'Personal', // <-- MAPEO DESDE JSON
-      esGrupal: (json['numero_visitantes'] as int? ?? 1) > 1,
+      idSolicitud: _toNullableInt(json['id_solicitud']),
+      tipoVisita: tipo,
+      esGrupal: numeroVisitantes > 1,
       visitantes: (json['visitantes'] as List<dynamic>? ?? [])
           .map((v) => VisitanteModel.fromJson(v as Map<String, dynamic>))
           .toList(),
-      lugarDestino: json['lugar_encuentro'] as String? ?? '',
-      fechaVisita: DateTime.parse(
-        json['fecha_inicio'] as String? ?? DateTime.now().toIso8601String(),
+      lugarDestino: json['lugar_encuentro']?.toString() ?? '',
+      fechaVisita: DateTime.tryParse(
+        json['fecha_inicio']?.toString() ?? '',
+      ) ??
+          DateTime.now(),
+      motivoVisita: json['motivo_visita']?.toString() ?? '',
+      toleranciaAntesMinutos: _toInt(
+        json['tolerancia_antes'],
+        defaultValue: 15,
       ),
-      motivoVisita: json['motivo_visita'] as String? ?? '',
-      toleranciaAntesMinutos: json['tolerancia_antes'] as int? ?? 15,
-      toleranciaDespuesMinutos: json['tolerancia_despues'] as int? ?? 15,
-      estado: _mapearEstado(json['id_estado_solicitud'] as int? ?? 1),
-      folio: 'VIS-${json['id_solicitud']?.toString().padLeft(8, '0') ?? '00000000'}',
+      toleranciaDespuesMinutos: _toInt(
+        json['tolerancia_despues'],
+        defaultValue: 15,
+      ),
+      estado: _mapearEstado(estadoId),
+      folio: json['folio']?.toString() ??
+          'VIS-${json['id_solicitud']?.toString().padLeft(8, '0') ?? '00000000'}',
       fechaCreacion: json['fecha_creacion'] != null
-          ? DateTime.parse(json['fecha_creacion'] as String)
+          ? DateTime.tryParse(json['fecha_creacion'].toString())
           : null,
-      idSolicitante: json['id_solicitante'] as int?,
+      idSolicitante: _toNullableInt(json['id_solicitante']),
     );
   }
 
   static String _mapearEstado(int id) {
     switch (id) {
-      case 1: return 'Pendiente';
-      case 2: return 'Autorizada';
-      case 3: return 'Rechazada';
-      case 4: return 'Cancelada';
-      default: return 'Pendiente';
+      case 1:
+        return 'Pendiente';
+      case 2:
+        return 'Autorizada';
+      case 3:
+        return 'Rechazada';
+      case 4:
+        return 'Cancelada';
+      default:
+        return 'Pendiente';
     }
+  }
+
+  static int _toInt(dynamic value, {int defaultValue = 0}) {
+    if (value == null) return defaultValue;
+    if (value is int) return value;
+    return int.tryParse(value.toString()) ?? defaultValue;
+  }
+
+  static int? _toNullableInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    return int.tryParse(value.toString());
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'tipo_visita': tipoVisita, // <-- ENVÍO AL BACKEND
+      'tipo_visita': tipoVisita,
       'fecha_inicio': fechaVisita.toIso8601String(),
       'lugar_encuentro': lugarDestino,
       'motivo_visita': motivoVisita,
@@ -126,8 +178,10 @@ class CatalogoModel {
 
   factory CatalogoModel.fromJson(Map<String, dynamic> json) {
     return CatalogoModel(
-      id: json['id'] as int? ?? 0,
-      nombre: json['nombre'] as String? ?? '',
+      id: json['id'] as int? ??
+          json['id_tipo_solicitud'] as int? ??
+          0,
+      nombre: json['nombre']?.toString() ?? '',
     );
   }
 }

@@ -20,25 +20,54 @@ class VisitRequestDatasource {
 
   Future<VisitRequestModel> crearSolicitud(VisitRequestModel solicitud) async {
     AppLogger.info(_modulo, 'Creando solicitud de visita');
-    final respuesta = await _apiClient.post('/solicitudes', datos: solicitud.toJson());
-    return VisitRequestModel.fromJson(respuesta.data as Map<String, dynamic>);
+
+    final respuesta = await _apiClient.post(
+      '/solicitudes',
+      datos: solicitud.toJson(),
+    );
+
+    final data = respuesta.data as Map<String, dynamic>;
+    final solicitudJson = data['data'] as Map<String, dynamic>;
+
+    return VisitRequestModel.fromJson(solicitudJson);
   }
 
   Future<List<VisitRequestModel>> obtenerMisSolicitudes({
-    String? estado, DateTime? fechaInicio, DateTime? fechaFin,
+    String? estado,
+    DateTime? fechaInicio,
+    DateTime? fechaFin,
   }) async {
     final parametros = <String, dynamic>{};
+
     if (estado != null) parametros['estado'] = estado;
-    if (fechaInicio != null) parametros['fecha_inicio'] = fechaInicio.toIso8601String();
-    if (fechaFin != null) parametros['fecha_fin'] = fechaFin.toIso8601String();
-    final respuesta = await _apiClient.get('/solicitudes', parametros: parametros);
-    final lista = respuesta.data as List<dynamic>? ?? [];
-    return lista.map((s) => VisitRequestModel.fromJson(s as Map<String, dynamic>)).toList();
+    if (fechaInicio != null) {
+      parametros['fecha_inicio'] = fechaInicio.toIso8601String();
+    }
+    if (fechaFin != null) {
+      parametros['fecha_fin'] = fechaFin.toIso8601String();
+    }
+
+    final respuesta = await _apiClient.get(
+      '/solicitudes',
+      parametros: parametros,
+    );
+
+    final data = respuesta.data as Map<String, dynamic>;
+    final paginacion = data['data'] as Map<String, dynamic>;
+    final lista = paginacion['data'] as List<dynamic>? ?? [];
+
+    return lista
+        .map((s) => VisitRequestModel.fromJson(s as Map<String, dynamic>))
+        .toList();
   }
 
   Future<VisitRequestModel> obtenerDetalle(int idSolicitud) async {
     final respuesta = await _apiClient.get('/solicitudes/$idSolicitud');
-    return VisitRequestModel.fromJson(respuesta.data as Map<String, dynamic>);
+
+    final data = respuesta.data as Map<String, dynamic>;
+    final solicitudJson = data['data'] as Map<String, dynamic>;
+
+    return VisitRequestModel.fromJson(solicitudJson);
   }
 
   Future<void> cancelarSolicitud(int idSolicitud) async {
@@ -55,8 +84,21 @@ class VisitRequestDatasource {
 
   Future<List<CatalogoModel>> obtenerDepartamentos() async {
     final respuesta = await _apiClient.get('/catalogos/departamentos');
-    final lista = respuesta.data as List<dynamic>? ?? [];
-    return lista.map((d) => CatalogoModel.fromJson(d as Map<String, dynamic>)).toList();
+
+    final data = respuesta.data;
+
+    if (data is Map<String, dynamic>) {
+      final lista = data['data'] as List<dynamic>? ?? [];
+      return lista
+          .map((d) => CatalogoModel.fromJson(d as Map<String, dynamic>))
+          .toList();
+    }
+
+    final lista = data as List<dynamic>? ?? [];
+
+    return lista
+        .map((d) => CatalogoModel.fromJson(d as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> enviarQr(int idSolicitud) async {
