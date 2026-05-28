@@ -3,19 +3,21 @@
 // Archivo   : qr_scanner_screen.dart
 // Módulo    : features/access_control/presentation/screens
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
-// Versión   : 1.0.2
-// Descripción: Pantalla de escaneo QR para vigilante — RF-022 (Mapeo de Auth Corregido)
+// Fecha     : 2026-05-28
+// Versión   : 1.1.0
+// Descripción: Pantalla de escaneo QR para vigilante — RF-022
+//              Fix: teléfono y área leídos de SecureStorage, no de AuthState
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/loading_widget.dart';
-import '../../../auth/bloc/auth_bloc.dart';
 import '../../bloc/access_control_bloc.dart';
 import '../../data/access_repository.dart';
 import '../dialogs/manual_code_dialog.dart';
@@ -43,13 +45,20 @@ class _QrScannerView extends StatefulWidget {
 }
 
 class _QrScannerViewState extends State<_QrScannerView> {
+  final _storage = const FlutterSecureStorage();
+
   MobileScannerController? _scannerController;
   bool _escaneando = true;
+
+  // Teléfono y área del vigilante leídos de SecureStorage al iniciar
+  String _telefono = '';
+  String _area     = '';
 
   @override
   void initState() {
     super.initState();
     _scannerController = MobileScannerController();
+    _cargarDatosVigilante();
   }
 
   @override
@@ -58,23 +67,35 @@ class _QrScannerViewState extends State<_QrScannerView> {
     super.dispose();
   }
 
-  String _obtenerTelefono(BuildContext context) {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is AuthAuthenticated) return authState.correoPersonal;
-    return '';
+  // ── Carga teléfono y área desde almacenamiento seguro ─────────────────────
+  Future<void> _cargarDatosVigilante() async {
+    final tel  = await _storage.read(key: AppConfig.claveTelefonoVigilante) ?? '';
+    final area = await _storage.read(key: AppConfig.claveAreaVigilante)     ?? '';
+    if (mounted) {
+      setState(() {
+        _telefono = tel;
+        _area     = area;
+      });
+    }
   }
 
-  String _obtenerArea(BuildContext context) {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is AuthAuthenticated) return authState.correoPuesto;
-    return '';
-  }
-
-  void _onQrDetectado(BuildContext context, BarcodeCapture capture) {
+  // ── Escaneo por cámara ────────────────────────────────────────────────────
+  void _onQrDetectado(BarcodeCapture capture) {
     if (!_escaneando) return;
 
     final barcode = capture.barcodes.firstOrNull;
     if (barcode?.rawValue == null) return;
+
+    // Validar que tengamos teléfono antes de enviar
+    if (_telefono.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se encontraron datos del vigilante. Vuelve a identificarte.'),
+          backgroundColor: AppColors.actionRed,
+        ),
+      );
+      return;
+    }
 
     setState(() => _escaneando = false);
     _scannerController?.stop();
@@ -82,34 +103,47 @@ class _QrScannerViewState extends State<_QrScannerView> {
     context.read<AccessControlBloc>().add(
       EscanearQr(
         codigoQr: barcode!.rawValue!,
-        telefono: _obtenerTelefono(context),
-        area: _obtenerArea(context),
+        telefono: _telefono,
+        area:     _area,
       ),
     );
   }
 
-  Future<void> _onRegistroManual(BuildContext context) async {
+  // ── Ingreso manual ────────────────────────────────────────────────────────
+  Future<void> _onRegistroManual() async {
     final codigo = await ManualCodeDialog.mostrar(context);
-    if (codigo != null && context.mounted) {
-      setState(() => _escaneando = false);
-      _scannerController?.stop();
+    if (codigo == null || !context.mounted) return;
 
-      context.read<AccessControlBloc>().add(
-        RegistroManual(
-          codigoNumerico: codigo,
-          telefono: _obtenerTelefono(context),
-          area: _obtenerArea(context),
+    if (_telefono.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se encontraron datos del vigilante. Vuelve a identificarte.'),
+          backgroundColor: AppColors.actionRed,
         ),
       );
+      return;
     }
+
+    setState(() => _escaneando = false);
+    _scannerController?.stop();
+
+    context.read<AccessControlBloc>().add(
+      RegistroManual(
+        codigoNumerico: codigo,
+        telefono:       _telefono,
+        area:           _area,
+      ),
+    );
   }
 
-  void _onNuevoEscaneo(BuildContext context) {
+  // ── Resetear para nuevo escaneo ───────────────────────────────────────────
+  void _onNuevoEscaneo() {
     context.read<AccessControlBloc>().add(ResetAcceso());
     setState(() => _escaneando = true);
     _scannerController?.start();
   }
 
+  // ── UI ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -121,15 +155,13 @@ class _QrScannerViewState extends State<_QrScannerView> {
           style: TextStyle(color: AppColors.baseSurface),
         ),
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.baseSurface,
-          ),
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.baseSurface),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: BlocBuilder<AccessControlBloc, AccessControlState>(
         builder: (context, state) {
+
           if (state is AccessControlLoading) {
             return const LoadingWidget(mensaje: 'Validando acceso...');
           }
@@ -139,10 +171,8 @@ class _QrScannerViewState extends State<_QrScannerView> {
               padding: const EdgeInsets.all(AppSpacing.paddingPantalla),
               child: QrResultWidget(
                 resultado: state.resultado,
-                onNuevoEscaneo: () => _onNuevoEscaneo(context),
-                onExtenderTiempo: state.resultado.llegaTarde
-                    ? () {}
-                    : null,
+                onNuevoEscaneo: _onNuevoEscaneo,
+                onExtenderTiempo: state.resultado.llegaTarde ? () {} : null,
               ),
             );
           }
@@ -170,7 +200,7 @@ class _QrScannerViewState extends State<_QrScannerView> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     TextButton.icon(
-                      onPressed: () => _onNuevoEscaneo(context),
+                      onPressed: _onNuevoEscaneo,
                       icon: const Icon(
                         Icons.refresh_rounded,
                         color: AppColors.headingDark,
@@ -186,6 +216,7 @@ class _QrScannerViewState extends State<_QrScannerView> {
             );
           }
 
+          // ── Vista principal: cámara + botón manual ────────────────────────
           return Column(
             children: [
               Expanded(
@@ -194,8 +225,7 @@ class _QrScannerViewState extends State<_QrScannerView> {
                   children: [
                     MobileScanner(
                       controller: _scannerController,
-                      onDetect: (capture) =>
-                          _onQrDetectado(context, capture),
+                      onDetect: _onQrDetectado,   // ← ya no pasa context
                     ),
                     Center(
                       child: Container(
@@ -232,7 +262,7 @@ class _QrScannerViewState extends State<_QrScannerView> {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       TextButton.icon(
-                        onPressed: () => _onRegistroManual(context),
+                        onPressed: _onRegistroManual,  // ← ya no pasa context
                         icon: const Icon(
                           Icons.keyboard_rounded,
                           color: AppColors.headingDark,

@@ -43,6 +43,7 @@ class ApiClient {
     AppLogger.info(_modulo, 'Cliente HTTP inicializado — ${AppConfig.baseUrl}');
   }
 
+
   void _agregarInterceptores() {
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -67,22 +68,21 @@ class ApiClient {
             'Error: ${error.response?.statusCode} ${error.requestOptions.path}',
           );
 
-          // Solo limpiar sesión si el 401 viene de una ruta protegida,
-          // no del endpoint de login
           if (error.response?.statusCode == 401) {
             final esEndpointLogin = error.requestOptions.path.contains('/login');
-
             if (!esEndpointLogin) {
               AppLogger.warning(_modulo, 'Token expirado — cerrando sesión');
               await _limpiarSesion();
             }
           }
 
+          // ← Solo pasar el DioException original, sin convertir aquí
           return handler.next(error);
         },
       ),
     );
   }
+
 
   Future<Response> get(String endpoint, {Map<String, dynamic>? parametros}) async {
     try {
@@ -136,7 +136,11 @@ class ApiClient {
             mensaje: 'Sin conexión. Verifique su red e intente nuevamente',
           );
         case DioExceptionType.badResponse:
-          return _manejarCodigoHttp(error.response?.statusCode);
+        // ← Aquí sí tenemos acceso a error.response completo
+          return _manejarCodigoHttp(
+            error.response?.statusCode,
+            error.response,
+          );
         default:
           AppLogger.error(_modulo, 'Error desconocido: ${error.message}');
           return const NetworkException(
@@ -151,32 +155,42 @@ class ApiClient {
     );
   }
 
-  AppException _manejarCodigoHttp(int? codigo) {
+  AppException _manejarCodigoHttp(int? codigo, [Response? response]) {
+    // Extraer mensaje real del backend si existe
+    String? mensajeBackend;
+    try {
+      final body = response?.data;
+      if (body is Map) {
+        mensajeBackend = body['message'] as String?
+            ?? (body['errors'] as Map?)?.values.first?.toString();
+      }
+    } catch (_) {}
+
     switch (codigo) {
       case 400:
-        return const ValidationException(
-          mensaje: 'Datos incorrectos. Verifique la información',
+        return ValidationException(
+          mensaje: mensajeBackend ?? 'Datos incorrectos. Verifique la información',
         );
       case 401:
-        return const UnauthorizedException(
-          mensaje: 'Credenciales inválidas. Intente nuevamente',
+        return UnauthorizedException(
+          mensaje: mensajeBackend ?? 'Credenciales inválidas. Intente nuevamente',
         );
       case 403:
-        return const ForbiddenException(
-          mensaje: 'No tiene permisos para realizar esta acción',
+        return ForbiddenException(
+          mensaje: mensajeBackend ?? 'No tiene permisos para realizar esta acción',
         );
       case 404:
-        return const NotFoundException(
-          mensaje: 'Recurso no encontrado',
+        return NotFoundException(
+          mensaje: mensajeBackend ?? 'Recurso no encontrado',
         );
       case 422:
-        return const ValidationException(
-          mensaje: 'Datos incorrectos. Verifique la información',
+        return ValidationException(
+          mensaje: mensajeBackend ?? 'Datos incorrectos. Verifique la información',
         );
       default:
         AppLogger.error(_modulo, 'Error servidor: $codigo');
-        return const ServerException(
-          mensaje: 'Error del servidor. Intente más tarde',
+        return ServerException(
+          mensaje: mensajeBackend ?? 'Error del servidor. Intente más tarde',
         );
     }
   }

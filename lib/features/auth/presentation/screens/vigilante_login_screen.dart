@@ -12,11 +12,9 @@
 //   - Validación local corregida: no deja pasar si longitud < 10 dígitos.
 //   - BlocListener maneja AuthUnauthenticated con motivo (sesión expirada).
 // =============================================================================
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:phone_number_hint/phone_number_hint.dart';
 
 import '../../bloc/auth_bloc.dart';
 import '../../presentation/widgets/auth_header_widget.dart';
@@ -26,6 +24,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/widgets/primary_button_widget.dart';
+import 'phone_resolver.dart';   // ← import del helper
 
 class VigilanteLoginScreen extends StatefulWidget {
   const VigilanteLoginScreen({super.key});
@@ -36,12 +35,12 @@ class VigilanteLoginScreen extends StatefulWidget {
 
 class _VigilanteLoginScreenState extends State<VigilanteLoginScreen> {
   final _telefonoController = TextEditingController();
-  final _phoneHintPlugin    = PhoneNumberHint();
 
-  String _areaSeleccionada  = '';
-  bool   _telefonoTocado    = false;
-  bool   _areaTocada        = false;
-  bool   _buscandoNumero    = false;
+  // PhoneNumberHint ya no se instancia aquí, lo maneja PhoneResolver
+  String _areaSeleccionada = '';
+  bool   _telefonoTocado   = false;
+  bool   _areaTocada       = false;
+  bool   _buscandoNumero   = false;
 
   @override
   void initState() {
@@ -55,49 +54,39 @@ class _VigilanteLoginScreenState extends State<VigilanteLoginScreen> {
     super.dispose();
   }
 
-  // ── Obtener número real del dispositivo ───────────────────────────────────
+// ── Obtener número del dispositivo ────────────────────────────────────────
   Future<void> _pedirNumeroSIM() async {
     setState(() => _buscandoNumero = true);
     try {
-      final numero = await _phoneHintPlugin.requestHint();
+      final result = await PhoneResolver.resolver();
 
-      if (numero != null && numero.isNotEmpty && mounted) {
-        final limpio = _normalizarTelefono(numero);
-        // Solo pre-rellenar si obtuvo exactamente 10 dígitos reales
-        if (limpio.length == 10) {
-          setState(() {
-            _telefonoController.text = limpio;
-            _telefonoTocado = true;
-          });
-        }
-        // Si limpio.length < 10 significa que la SIM no tiene número
-        // registrado (devuelve solo "+52") → campo queda vacío
+      if (!mounted) return;
+
+      // if/else en lugar de switch para compatibilidad con SDK >=3.0
+      if (result.status == PhoneResolveStatus.success) {
+        setState(() {
+          _telefonoController.text = result.numero;
+          _telefonoTocado = true;
+        });
+      } else if (result.status == PhoneResolveStatus.permissionDenied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No se pudo leer el número de su SIM. '
+                  'Ingrésalo manualmente — quedará registrado '
+                  'en cada acceso que registre.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
       }
-    } on PlatformException catch (e) {
-      // Usuario canceló o dispositivo no soporta la API → campo manual
-      debugPrint('phone_number_hint cancelado: ${e.message}');
-    } catch (e) {
-      debugPrint('phone_number_hint error: $e');
+      // empty / cancelled / unsupported / error → campo manual, sin ruido
     } finally {
       if (mounted) setState(() => _buscandoNumero = false);
     }
   }
 
-  /// Elimina el prefijo internacional y deja solo los 10 dígitos locales.
-  /// Ej: "+521234567890" → "1234567890"
-  ///     "+52"           → ""  (SIM sin número registrado)
-  String _normalizarTelefono(String raw) {
-    String digits = raw.replaceAll(RegExp(r'\D'), '');
-    // México: +52 + 10 dígitos = 12 dígitos
-    if (digits.startsWith('52') && digits.length >= 12) {
-      digits = digits.substring(2);
-    }
-    // Truncar a 10 por seguridad
-    if (digits.length > 10) digits = digits.substring(digits.length - 10);
-    return digits;
-  }
-
-  // ── Validaciones ─────────────────────────────────────────────────────────
+  // ── Validaciones ──────────────────────────────────────────────────────────
   String? get _errorTelefono {
     if (!_telefonoTocado) return null;
     final tel = _telefonoController.text.trim();
@@ -154,7 +143,6 @@ class _VigilanteLoginScreenState extends State<VigilanteLoginScreen> {
               backgroundColor: AppColors.actionRed,
             ));
           } else if (state is AuthUnauthenticated && state.motivo != null) {
-            // Sesión expirada (inactividad o jornada) mientras estaba aquí
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(state.motivo!.mensajeUsuario),
               backgroundColor: AppColors.actionRed,
@@ -246,6 +234,7 @@ class _VigilanteLoginScreenState extends State<VigilanteLoginScreen> {
   }
 }
 
+// ── Banner informativo (sin cambios) ─────────────────────────────────────────
 class _InfoSesionBanner extends StatelessWidget {
   final int minutosInactividad;
   final int horasJornada;

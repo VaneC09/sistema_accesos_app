@@ -34,6 +34,10 @@ dependencies:
 
   # Tipografía institucional
   google_fonts: ^6.1.0
+
+  #obtener numero de telefono
+  sim_card_info: ^0.0.2
+  permission_handler: ^11.3.1
   phone_number_hint: ^0.0.6
 
 dev_dependencies:
