@@ -4,7 +4,9 @@
 // Módulo    : features/visit_request/data
 // Autor     : Omega Company
 // Fecha     : 2026-05-25
-// Versión   : 1.0.0
+// Versión   : 1.0.1
+// Cambio    : Corrige mapeo de tipo de visita.
+//              Consulta NO pertenece a solicitud normal.
 // =============================================================================
 
 class VisitanteModel {
@@ -80,18 +82,20 @@ class VisitRequestModel {
       defaultValue: 1,
     );
 
+    final idTipoSolicitud = _toInt(
+      json['id_tipo_solicitud'],
+      defaultValue: 3,
+    );
+
     String tipo = json['tipo_visita']?.toString() ?? '';
 
-    if (tipo.isEmpty && json['tipo'] is Map<String, dynamic>) {
-      final tipoJson = json['tipo'] as Map<String, dynamic>;
-      tipo = tipoJson['nombre']?.toString() ??
-          tipoJson['tipo']?.toString() ??
-          tipoJson['descripcion']?.toString() ??
-          '';
-    }
-
-    if (tipo.isEmpty) {
-      tipo = 'Personal';
+    // En backend, json['tipo'] puede venir como Individual / Grupal.
+    // Eso NO es el tipo real de visita para móvil.
+    // Por eso se usa id_tipo_solicitud.
+    if (tipo.isEmpty ||
+        tipo.toLowerCase().trim() == 'individual' ||
+        tipo.toLowerCase().trim() == 'grupal') {
+      tipo = _mapearTipoSolicitud(idTipoSolicitud);
     }
 
     return VisitRequestModel(
@@ -133,11 +137,41 @@ class VisitRequestModel {
         return 'Autorizada';
       case 3:
         return 'Rechazada';
-      case 4:
-        return 'Cancelada';
       default:
         return 'Pendiente';
     }
+  }
+
+  static String _mapearTipoSolicitud(int id) {
+    switch (id) {
+      case 1:
+        return 'Proveedor';
+      case 2:
+        return 'Institucional / Negocios';
+      case 3:
+        return 'Personal';
+      default:
+        return 'Personal';
+    }
+  }
+
+  static int _obtenerIdTipoSolicitud(String tipo) {
+    final tipoNormalizado = tipo.toLowerCase().trim();
+
+    if (tipoNormalizado.contains('proveedor')) {
+      return 1;
+    }
+
+    if (tipoNormalizado.contains('institucional') ||
+        tipoNormalizado.contains('negocios')) {
+      return 2;
+    }
+
+    if (tipoNormalizado.contains('personal')) {
+      return 3;
+    }
+
+    return 3;
   }
 
   static int _toInt(dynamic value, {int defaultValue = 0}) {
@@ -158,7 +192,7 @@ class VisitRequestModel {
       'fecha_inicio': fechaVisita.toIso8601String(),
       'lugar_encuentro': lugarDestino,
       'motivo_visita': motivoVisita,
-      'id_tipo_solicitud': esGrupal ? 2 : 1,
+      'id_tipo_solicitud': _obtenerIdTipoSolicitud(tipoVisita),
       'tolerancia_antes': toleranciaAntesMinutos,
       'tolerancia_despues': toleranciaDespuesMinutos,
       'numero_visitantes': visitantes.length,

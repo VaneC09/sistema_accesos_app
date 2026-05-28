@@ -4,7 +4,8 @@
 // Módulo    : features/visit_request/data
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
-// Versión   : 1.0.0
+// Versión   : 1.0.1
+// Cambio    : Agrega consumo de endpoint para enviar QR al visitante.
 // =============================================================================
 
 import '../../../core/connection/api_client.dart';
@@ -101,8 +102,17 @@ class VisitRequestDatasource {
         .toList();
   }
 
-  Future<void> enviarQr(int idSolicitud) async {
-    await _apiClient.post('/solicitudes/$idSolicitud/enviar-qr');
+  Future<String> enviarQr(int idSolicitud) async {
+    AppLogger.info(_modulo, 'Enviando QR de solicitud: $idSolicitud');
+
+    final respuesta = await _apiClient.post(
+      '/solicitudes/$idSolicitud/enviar-qr',
+    );
+
+    final data = respuesta.data as Map<String, dynamic>;
+
+    return data['message']?.toString() ??
+        'QR listo para compartir con el visitante.';
   }
 
   Future<void> reenviarQr(int idSolicitud) async {

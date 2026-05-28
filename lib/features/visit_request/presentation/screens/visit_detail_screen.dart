@@ -4,8 +4,10 @@
 // Módulo    : features/visit_request/presentation/screens
 // Autor     : Omega Company
 // Fecha     : 2026-05-27
-// Versión   : 1.0.0
+// Versión   : 1.0.1
 // Descripción: Pantalla de detalle de solicitud de visita — RF-017
+// Cambio    : Agrega botón para enviar QR al visitante cuando la solicitud
+//             está autorizada.
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -33,6 +35,8 @@ class _VisitDetailScreenState extends State<VisitDetailScreen> {
 
   late Future<VisitRequestModel> _futureSolicitud;
 
+  bool _enviandoQr = false;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +47,52 @@ class _VisitDetailScreenState extends State<VisitDetailScreen> {
     setState(() {
       _futureSolicitud = _repository.obtenerDetalle(widget.idSolicitud);
     });
+  }
+
+  Future<void> _enviarQrAlVisitante(VisitRequestModel solicitud) async {
+    final idSolicitud = solicitud.idSolicitud;
+
+    if (idSolicitud == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo identificar la solicitud.'),
+          backgroundColor: AppColors.actionRed,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _enviandoQr = true;
+    });
+
+    try {
+      final mensaje = await _repository.enviarQr(idSolicitud);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mensaje),
+          backgroundColor: AppColors.successGreen,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No fue posible enviar el QR al visitante.'),
+          backgroundColor: AppColors.actionRed,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _enviandoQr = false;
+        });
+      }
+    }
   }
 
   @override
@@ -87,6 +137,9 @@ class _VisitDetailScreenState extends State<VisitDetailScreen> {
               onReintentar: _recargar,
             );
           }
+
+          final estaAutorizada =
+              solicitud.estado.toLowerCase().trim() == 'autorizada';
 
           return RefreshIndicator(
             onRefresh: _recargar,
@@ -167,8 +220,14 @@ class _VisitDetailScreenState extends State<VisitDetailScreen> {
 
                   const SizedBox(height: AppSpacing.md),
 
-                  if (solicitud.estado.toLowerCase() == 'autorizada')
+                  if (estaAutorizada) ...[
                     _AvisoQrAutorizado(),
+                    const SizedBox(height: AppSpacing.md),
+                    _BotonEnviarQr(
+                      enviando: _enviandoQr,
+                      onPressed: () => _enviarQrAlVisitante(solicitud),
+                    ),
+                  ],
 
                   if (solicitud.estado.toLowerCase() == 'pendiente')
                     _AvisoPendiente(),
@@ -485,6 +544,52 @@ class _VisitanteItem extends StatelessWidget {
   }
 }
 
+class _BotonEnviarQr extends StatelessWidget {
+  final bool enviando;
+  final VoidCallback onPressed;
+
+  const _BotonEnviarQr({
+    required this.enviando,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: enviando ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryCoral,
+          foregroundColor: AppColors.baseSurface,
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.md,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+          ),
+        ),
+        icon: enviando
+            ? const SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.baseSurface,
+          ),
+        )
+            : const Icon(Icons.send_rounded),
+        label: Text(
+          enviando ? 'Enviando QR...' : 'Enviar QR al visitante',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AvisoQrAutorizado extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -492,7 +597,7 @@ class _AvisoQrAutorizado extends StatelessWidget {
       icono: Icons.qr_code_2_rounded,
       titulo: 'Solicitud autorizada',
       mensaje:
-      'La visita fue autorizada. El código QR se genera desde el backend y podrá consultarse o enviarse según la configuración del sistema.',
+      'La visita fue autorizada. Puedes enviar el pase QR al visitante desde el botón inferior.',
       color: AppColors.successGreen,
     );
   }

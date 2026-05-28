@@ -4,8 +4,9 @@
 // Módulo    : features/visit_request/data
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
-// Versión   : 1.0.0
+// Versión   : 1.0.1
 // Descripción: Repositorio de solicitudes de visita — RF-013, RF-014, RF-015
+// Cambio    : enviarQr ahora devuelve el mensaje del backend.
 // =============================================================================
 
 import '../../../core/errors/app_exceptions.dart';
@@ -115,9 +116,9 @@ class VisitRequestRepository {
   }
 
   // Enviar QR
-  Future<void> enviarQr(int idSolicitud) async {
+  Future<String> enviarQr(int idSolicitud) async {
     try {
-      await _datasource.enviarQr(idSolicitud);
+      return await _datasource.enviarQr(idSolicitud);
     } on AppException {
       rethrow;
     } catch (e) {

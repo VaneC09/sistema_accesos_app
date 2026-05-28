@@ -3,20 +3,21 @@
 // Archivo   : consulta_screen.dart
 // Módulo    : features/visit_request/presentation/screens
 // Autor     : Omega Company
-// Fecha     : 2026-05-25
-// Versión   : 1.0.0
-// Descripción: Solicitud de visita por consulta para vigilante — RF-014, RF-049
+// Fecha     : 2026-05-28
+// Versión   : 2.0.0
+// Descripción: Registro de visita espontánea de consulta para vigilante — RF-014
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/widgets/loading_widget.dart';
 import '../../../../core/widgets/primary_button_widget.dart';
-import '../../bloc/visit_request_bloc.dart';
-import '../../data/visit_request_model.dart';
-import '../../data/visit_request_repository.dart';
+import '../../bloc/consulta_bloc.dart';
+import '../../data/consulta_model.dart';
+import '../../data/consulta_repository.dart';
 
 class ConsultaScreen extends StatelessWidget {
   const ConsultaScreen({super.key});
@@ -24,8 +25,8 @@ class ConsultaScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => VisitRequestBloc(
-        repository: VisitRequestRepository(),
+      create: (_) => ConsultaBloc(
+        repository: ConsultaRepository(),
       ),
       child: const _ConsultaView(),
     );
@@ -43,9 +44,9 @@ class _ConsultaViewState extends State<_ConsultaView> {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
   final _correoController = TextEditingController();
+
   String _lugarSeleccionado = '';
 
-  // RF-014: solo 2 destinos para visita de consulta
   final List<String> _lugares = [
     'División de Comunicación y Difusión',
     'Desarrollo Académico',
@@ -71,37 +72,45 @@ class _ConsultaViewState extends State<_ConsultaView> {
       return;
     }
 
-    final solicitud = VisitRequestModel(
-      tipoVisita: 'Consulta',
-      esGrupal: false,
-      visitantes: [
-        VisitanteModel(
-          nombre: _nombreController.text.trim(),
-          correo: _correoController.text.trim(),
-        ),
-      ],
+    final consulta = ConsultaRequestModel(
+      nombreVisitante: _nombreController.text.trim(),
+      correoVisitante: _correoController.text.trim(),
       lugarDestino: _lugarSeleccionado,
-      fechaVisita: DateTime.now(),
-      motivoVisita: 'Visita espontánea de consulta',
-      toleranciaAntesMinutos: 0,
-      toleranciaDespuesMinutos: 30,
     );
 
-    context.read<VisitRequestBloc>().add(
-      VisitRequestSubmitted(solicitud: solicitud),
+    context.read<ConsultaBloc>().add(
+      ConsultaSubmitted(consulta: consulta),
     );
+  }
+
+  void _limpiarFormulario() {
+    _nombreController.clear();
+    _correoController.clear();
+    setState(() => _lugarSeleccionado = '');
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<VisitRequestBloc, VisitRequestState>(
+    return BlocListener<ConsultaBloc, ConsultaState>(
       listener: (context, state) {
-        if (state is VisitRequestSuccess) {
+        if (state is ConsultaSuccess) {
+          final resultado = state.resultado;
+
           showDialog(
             context: context,
             barrierDismissible: false,
             builder: (_) => AlertDialog(
-              title: const Text('Solicitud registrada'),
+              backgroundColor: AppColors.baseSurface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
+              ),
+              title: const Text(
+                'Visita registrada',
+                style: TextStyle(
+                  color: AppColors.deepNavy,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -112,22 +121,54 @@ class _ConsultaViewState extends State<_ConsultaView> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'El pase QR fue enviado al correo del visitante.',
+                    resultado.mensaje,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Folio: ${state.folio}',
                     style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: AppColors.deepNavy,
+                      fontSize: 14,
+                      color: AppColors.onyxGrey,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _InfoResultado(
+                    etiqueta: 'Visitante',
+                    valor: resultado.nombreVisitante,
+                  ),
+                  _InfoResultado(
+                    etiqueta: 'Destino',
+                    valor: resultado.lugarDestino,
+                  ),
+                  _InfoResultado(
+                    etiqueta: 'Folio',
+                    valor: resultado.folio,
+                  ),
+                  if (resultado.codigoQr.isNotEmpty)
+                    _InfoResultado(
+                      etiqueta: 'Código QR',
+                      valor: resultado.codigoQr,
+                    ),
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text(
+                    'El QR podrá usarse para registrar entrada y salida.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.neutralGrey,
                     ),
                   ),
                 ],
               ),
               actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _limpiarFormulario();
+                    context.read<ConsultaBloc>().add(ConsultaReset());
+                  },
+                  child: const Text(
+                    'Registrar otra',
+                    style: TextStyle(color: AppColors.headingDark),
+                  ),
+                ),
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
@@ -142,7 +183,9 @@ class _ConsultaViewState extends State<_ConsultaView> {
               ],
             ),
           );
-        } else if (state is VisitRequestError) {
+        }
+
+        if (state is ConsultaError) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.mensaje),
@@ -167,10 +210,12 @@ class _ConsultaViewState extends State<_ConsultaView> {
             onPressed: () => Navigator.pop(context),
           ),
         ),
-        body: BlocBuilder<VisitRequestBloc, VisitRequestState>(
+        body: BlocBuilder<ConsultaBloc, ConsultaState>(
           builder: (context, state) {
-            if (state is VisitRequestLoading) {
-              return const LoadingWidget(mensaje: 'Registrando visita...');
+            if (state is ConsultaLoading) {
+              return const LoadingWidget(
+                mensaje: 'Registrando visita de consulta...',
+              );
             }
 
             return SingleChildScrollView(
@@ -180,21 +225,25 @@ class _ConsultaViewState extends State<_ConsultaView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Encabezado informativo
                     Container(
                       padding: const EdgeInsets.all(AppSpacing.md),
                       decoration: BoxDecoration(
                         color: AppColors.headingSky.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMedium,
+                        ),
                         border: Border.all(color: AppColors.headingSky),
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.info_outline_rounded, color: AppColors.steelBlue),
+                          Icon(
+                            Icons.info_outline_rounded,
+                            color: AppColors.steelBlue,
+                          ),
                           SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Text(
-                              'Registro de visita espontánea. El QR se enviará al correo del visitante.',
+                              'Registra una visita espontánea. No requiere autorización de jefe y se generará un pase QR para entrada y salida.',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: AppColors.steelBlue,
@@ -206,7 +255,6 @@ class _ConsultaViewState extends State<_ConsultaView> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
 
-                    // Nombre del visitante
                     TextFormField(
                       controller: _nombreController,
                       textCapitalization: TextCapitalization.words,
@@ -215,15 +263,21 @@ class _ConsultaViewState extends State<_ConsultaView> {
                         prefixIcon: Icon(Icons.person_outline_rounded),
                       ),
                       validator: (value) {
-                        if (value == null || value.trim().length < 5) {
+                        final nombre = value?.trim() ?? '';
+
+                        if (nombre.isEmpty) {
+                          return 'El nombre es obligatorio';
+                        }
+
+                        if (nombre.length < 5) {
                           return 'El nombre debe tener al menos 5 caracteres';
                         }
+
                         return null;
                       },
                     ),
                     const SizedBox(height: AppSpacing.md),
 
-                    // Correo del visitante
                     TextFormField(
                       controller: _correoController,
                       keyboardType: TextInputType.emailAddress,
@@ -232,31 +286,45 @@ class _ConsultaViewState extends State<_ConsultaView> {
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
+                        final correo = value?.trim() ?? '';
+
+                        if (correo.isEmpty) {
                           return 'El correo es obligatorio';
                         }
-                        final regex = RegExp(r'^[\w.-]+@[\w.-]+\.\w+$');
-                        if (!regex.hasMatch(value.trim())) {
+
+                        final regex = RegExp(
+                          r'^[\w\.-]+@[\w\.-]+\.\w+$',
+                        );
+
+                        if (!regex.hasMatch(correo)) {
                           return 'Formato de correo inválido';
                         }
+
                         return null;
                       },
                     ),
                     const SizedBox(height: AppSpacing.md),
 
-                    // Lugar destino — RF-014: solo 2 opciones
                     DropdownButtonFormField<String>(
-                      value: _lugarSeleccionado.isEmpty ? null : _lugarSeleccionado,
-                      isExpanded: true,   // ← agregar esto
+                      value: _lugarSeleccionado.isEmpty
+                          ? null
+                          : _lugarSeleccionado,
+                      isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Lugar destino',
+                        prefixIcon: Icon(Icons.location_on_outlined),
                       ),
                       hint: const Text('Seleccione el destino'),
                       items: _lugares
-                          .map((lugar) => DropdownMenuItem(
-                        value: lugar,
-                        child: Text(lugar),
-                      ))
+                          .map(
+                            (lugar) => DropdownMenuItem(
+                          value: lugar,
+                          child: Text(
+                            lugar,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
                           .toList(),
                       onChanged: (value) {
                         setState(() => _lugarSeleccionado = value ?? '');
@@ -271,7 +339,7 @@ class _ConsultaViewState extends State<_ConsultaView> {
                     const SizedBox(height: AppSpacing.xl),
 
                     PrimaryButtonWidget(
-                      texto: 'Registrar visita y enviar QR',
+                      texto: 'Registrar visita y generar QR',
                       icono: Icons.qr_code_rounded,
                       onPressed: _onEnviar,
                     ),
@@ -281,6 +349,45 @@ class _ConsultaViewState extends State<_ConsultaView> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _InfoResultado extends StatelessWidget {
+  final String etiqueta;
+  final String valor;
+
+  const _InfoResultado({
+    required this.etiqueta,
+    required this.valor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (valor.trim().isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$etiqueta: ',
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.deepNavy,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              valor,
+              style: const TextStyle(
+                color: AppColors.onyxGrey,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
