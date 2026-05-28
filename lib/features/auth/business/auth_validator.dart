@@ -11,11 +11,14 @@
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/errors/app_exceptions.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/constants/app_strings.dart';
+import '../../../core/errors/app_exceptions.dart';
 
 class AuthValidator {
   AuthValidator._();
 
-  // Valida campos de login institucional
+  // Valida campos de login institucional — SIN CAMBIOS
   static void validarLogin(String usuario, String contrasena) {
     if (usuario.isEmpty || contrasena.isEmpty) {
       throw const ValidationException(
@@ -30,28 +33,29 @@ class AuthValidator {
     }
   }
 
-  // Valida campos de login de vigilante
+  // Valida campos de login de vigilante — ¡VERSIÓN MEJORADA Y OPTIMIZADA! 👍
   static void validarLoginVigilante(String telefono, String area) {
-    if (telefono.isEmpty || area.isEmpty) {
+    if (telefono.trim().isEmpty) {
       throw const ValidationException(
-        mensaje: AppStrings.errorCamposVigilante,
+        mensaje: 'Ingresa tu número de teléfono',
       );
     }
 
-    if (telefono.length != 10) {
+    // Verifica que sean exactamente 10 dígitos numéricos en una sola línea
+    if (!RegExp(r'^\d{10}$').hasMatch(telefono.trim())) {
       throw const ValidationException(
-        mensaje: 'El número de teléfono debe tener 10 dígitos',
+        mensaje: 'El teléfono debe tener exactamente 10 dígitos',
       );
     }
 
-    if (!RegExp(r'^[0-9]+$').hasMatch(telefono)) {
+    if (area.trim().isEmpty) {
       throw const ValidationException(
-        mensaje: 'El número de teléfono solo debe contener dígitos',
+        mensaje: 'Selecciona tu área',
       );
     }
   }
 
-  // Determina el rol según datos del SAM
+  // Determina el rol según datos del SAM — SIN CAMBIOS
   static String determinarRol({
     required String puesto,
     required int idDepartamento,

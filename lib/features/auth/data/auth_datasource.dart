@@ -19,38 +19,32 @@ class AuthDatasource {
   AuthDatasource({ApiClient? apiClient})
       : _apiClient = apiClient ?? ApiClient.instancia;
 
+  // Login empleado (solicitante / autorizador) — SIN CAMBIOS
   Future<AuthModel> login(String usuario, String contrasena) async {
     AppLogger.info(_modulo, 'Intentando login: $usuario');
 
     final respuesta = await _apiClient.post(
       '/login',
-      datos: {
-        'usuario': usuario,
-        'password': contrasena,
-      },
+      datos: {'usuario': usuario, 'password': contrasena},
     );
 
-    // El backend responde { "message": "...", "data": { token, rol, ... } }
-    // Hay que extraer el objeto "data" antes de parsear el modelo
-    final body = respuesta.data as Map<String, dynamic>;
+    final body    = respuesta.data as Map<String, dynamic>;
     final payload = body['data'] as Map<String, dynamic>;
 
     AppLogger.info(_modulo, 'Login exitoso — rol: ${payload['rol']}');
     return AuthModel.fromJson(payload);
   }
 
+  // Login vigilante — el servidor solo valida formato, no busca en BD
   Future<AuthModel> loginVigilante(String telefono, String area) async {
     AppLogger.info(_modulo, 'Login vigilante — area: $area');
 
     final respuesta = await _apiClient.post(
       '/vigilante/login',
-      datos: {
-        'telefono': telefono,
-        'area': area,
-      },
+      datos: {'telefono': telefono, 'area': area},
     );
 
-    final body = respuesta.data as Map<String, dynamic>;
+    final body    = respuesta.data as Map<String, dynamic>;
     final payload = body['data'] as Map<String, dynamic>;
 
     AppLogger.info(_modulo, 'Login vigilante exitoso');
@@ -58,7 +52,8 @@ class AuthDatasource {
   }
 
   Future<void> logout(String token) async {
-    AppLogger.info(_modulo, 'Cerrando sesion en backend');
+    AppLogger.info(_modulo, 'Cerrando sesión en backend');
+    // El vigilante no tiene sesión en backend — solo el empleado
     await _apiClient.post('/logout');
   }
 }

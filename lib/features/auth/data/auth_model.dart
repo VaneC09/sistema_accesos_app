@@ -32,21 +32,18 @@ class AuthModel {
   });
 
   factory AuthModel.fromJson(Map<String, dynamic> json) {
-    // El backend manda exactamente: 'autorizador', 'solicitante', 'vigilante'
-    // en el campo 'rol'. No se transforma, se usa directo.
     final String rol = (json['rol'] ?? 'solicitante').toString().toLowerCase().trim();
 
     return AuthModel(
-      token:          json['token']           as String? ?? '',
-      usuario:        json['email']           as String? ?? '',
+      token:          (json['token']           as String?) ?? '',
+      usuario:        (json['email']           as String?) ?? '',
       rol:            rol,
-      nombre:         json['name']            as String? ?? '',
-      correoPersonal: json['email']           as String? ?? '',
-      correoPuesto:   json['departamento']    as String? ?? '',
-      idEmpleado:     json['id_empleado_sam'] as int?
-          ?? json['id']           as int? ?? 0,
-      idDepartamento: json['id_departamento'] as int? ?? 0,
-      puesto:         json['rol_api']         as String? ?? rol,
+      nombre:         (json['name']            as String?) ?? '',
+      correoPersonal: (json['email']           as String?) ?? '',
+      correoPuesto:   (json['departamento']    as String?) ?? '',
+      idEmpleado:     (json['id_empleado_sam'] as int?) ?? (json['id'] as int?) ?? 0,
+      idDepartamento: (json['id_departamento'] as int?) ?? 0,
+      puesto:         (json['rol_api']         as String?) ?? rol,
     );
   }
 
@@ -56,9 +53,12 @@ class AuthModel {
     );
   }
 
+  /// True si tiene token Sanctum (empleados). Vigilante siempre false.
+  bool get tieneTokenSanctum => token.isNotEmpty;
+
   Map<String, dynamic> toJson() => {
     'token':           token,
-    'email':           usuario,   // ← clave 'email' para que fromJson la lea bien
+    'email':           usuario,
     'rol':             rol,
     'name':            nombre,
     'departamento':    correoPuesto,

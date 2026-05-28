@@ -616,6 +616,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.2"
+  phone_number_hint:
+    dependency: "direct main"
+    description:
+      name: phone_number_hint
+      sha256: "0330f5dbb1203cef25da7ebb349398a9591e747ac1591bd082fdfc2dcdce6902"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.6"
   platform:
     dependency: transitive
     description:

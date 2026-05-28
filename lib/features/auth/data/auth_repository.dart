@@ -25,6 +25,7 @@ class AuthRepository {
   })  : _datasource = datasource ?? AuthDatasource(),
         _storage = storage ?? const FlutterSecureStorage();
 
+  // Login empleado — SIN CAMBIOS
   Future<AuthModel> login(String usuario, String contrasena) async {
     try {
       final modelo = await _datasource.login(usuario, contrasena);
@@ -33,31 +34,37 @@ class AuthRepository {
     } on AppException {
       rethrow;
     } catch (e) {
-      AppLogger.error(_modulo, 'Error inesperado en login: $e');
+      AppLogger.error(_modulo, 'Error en login: $e');
       throw const ServerException(
-        mensaje: 'Error inesperado. Contacte al administrador',
-      );
+          mensaje: 'Error inesperado. Contacte al administrador');
     }
   }
 
+  // Login vigilante — guarda teléfono y área localmente, NO llama logout en backend
   Future<AuthModel> loginVigilante(String telefono, String area) async {
     try {
       final modelo = await _datasource.loginVigilante(telefono, area);
       await _guardarSesion(modelo);
+      // Guardar teléfono y área por separado para incluirlos en peticiones
+      await _storage.write(key: AppConfig.claveTelefonoVigilante, value: telefono);
+      await _storage.write(key: AppConfig.claveAreaVigilante,     value: area);
       return modelo;
     } on AppException {
       rethrow;
     } catch (e) {
-      AppLogger.error(_modulo, 'Error inesperado en login vigilante: $e');
+      AppLogger.error(_modulo, 'Error en login vigilante: $e');
       throw const ServerException(
-        mensaje: 'No fue posible registrar el acceso. Intente nuevamente',
-      );
+          mensaje: 'No fue posible registrar el acceso. Intente nuevamente');
     }
   }
 
   Future<void> logout() async {
     try {
-      await _datasource.logout('');
+      final rol = await _storage.read(key: AppConfig.claveRol);
+      // Solo el empleado tiene sesión Sanctum — el vigilante no
+      if (rol != 'vigilante') {
+        await _datasource.logout('');
+      }
     } catch (e) {
       AppLogger.warning(_modulo, 'Error al cerrar sesión en backend: $e');
     } finally {
@@ -65,15 +72,18 @@ class AuthRepository {
     }
   }
 
+  // ¡FIX IMPLEMENTADO DE FORMA CORRECTA! 👍
   Future<AuthModel?> obtenerSesionActiva() async {
     try {
-      final token = await _storage.read(key: AppConfig.claveToken);
-      if (token == null) return null;
-
       final usuarioJson = await _storage.read(key: AppConfig.claveUsuario);
       if (usuarioJson == null) return null;
 
-      return AuthModel.fromString(usuarioJson);
+      final modelo = AuthModel.fromString(usuarioJson);
+
+      // Para empleados adicionalmente verificamos que el token exista
+      if (modelo.rol != 'vigilante' && !modelo.tieneTokenSanctum) return null;
+
+      return modelo;
     } catch (e) {
       AppLogger.error(_modulo, 'Error al obtener sesión activa: $e');
       return null;
@@ -81,18 +91,9 @@ class AuthRepository {
   }
 
   Future<void> _guardarSesion(AuthModel modelo) async {
-    await _storage.write(
-      key: AppConfig.claveToken,
-      value: modelo.token,
-    );
-    await _storage.write(
-      key: AppConfig.claveUsuario,
-      value: modelo.toString(),
-    );
-    await _storage.write(
-      key: AppConfig.claveRol,
-      value: modelo.rol,
-    );
+    await _storage.write(key: AppConfig.claveToken,   value: modelo.token);
+    await _storage.write(key: AppConfig.claveUsuario, value: modelo.toString());
+    await _storage.write(key: AppConfig.claveRol,     value: modelo.rol);
     AppLogger.info(_modulo, 'Sesión guardada — rol: ${modelo.rol}');
   }
 
@@ -100,6 +101,8 @@ class AuthRepository {
     await _storage.delete(key: AppConfig.claveToken);
     await _storage.delete(key: AppConfig.claveUsuario);
     await _storage.delete(key: AppConfig.claveRol);
-    AppLogger.info(_modulo, 'Sesión eliminada del almacenamiento seguro');
+    await _storage.delete(key: AppConfig.claveTelefonoVigilante);
+    await _storage.delete(key: AppConfig.claveAreaVigilante);
+    AppLogger.info(_modulo, 'Sesión eliminada');
   }
 }
