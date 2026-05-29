@@ -254,14 +254,21 @@ class _NotificationCard extends StatelessWidget {
       case TipoNotificacion.visitanteIngreso:
         return Icons.login_rounded;
 
+      case TipoNotificacion.visitanteSalida:
+        return Icons.logout_rounded;
+
       case TipoNotificacion.visitanteLlegadaTarde:
+      case TipoNotificacion.qrExpiradoTolerancia:
         return Icons.access_time_rounded;
 
       case TipoNotificacion.permanenciaExcedida:
         return Icons.warning_amber_rounded;
 
       case TipoNotificacion.qrExtendido:
-        return Icons.qr_code_2_rounded;
+        return Icons.more_time_rounded;
+
+      case TipoNotificacion.solicitudExtension:
+        return Icons.timer_outlined;
 
       case TipoNotificacion.nuevaSolicitudPendiente:
         return Icons.notifications_rounded;
@@ -272,6 +279,7 @@ class _NotificationCard extends StatelessWidget {
     switch (tipo) {
       case TipoNotificacion.solicitudAutorizada:
       case TipoNotificacion.visitanteIngreso:
+      case TipoNotificacion.visitanteSalida:
       case TipoNotificacion.qrExtendido:
         return AppColors.successGreen;
 
@@ -280,6 +288,10 @@ class _NotificationCard extends StatelessWidget {
       case TipoNotificacion.visitanteLlegadaTarde:
       case TipoNotificacion.permanenciaExcedida:
         return AppColors.actionRed;
+
+      case TipoNotificacion.qrExpiradoTolerancia:
+      case TipoNotificacion.solicitudExtension:
+        return AppColors.warningOrange;
 
       case TipoNotificacion.nuevaSolicitudPendiente:
         return AppColors.primaryCoral;

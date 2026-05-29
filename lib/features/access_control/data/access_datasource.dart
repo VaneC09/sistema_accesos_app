@@ -28,7 +28,7 @@ class AccessDatasource {
     AppLogger.info(_modulo, 'Escaneando QR');
     final respuesta = await _apiClient.post(
       '/vigilante/escanear',
-      datos: { 'codigo_qr': codigoQr, 'telefono': telefono, 'area': area },
+      datos: { 'codigo_qr': codigoQr, 'telefono': telefono, 'area': area},
     );
     AppLogger.info(_modulo, 'Respuesta raw escanear: ${respuesta.data}');
     final body = respuesta.data as Map<String, dynamic>;
@@ -45,7 +45,8 @@ class AccessDatasource {
     final respuesta = await _apiClient.post(
       '/vigilante/escanear', // ← Ruta unificada con escanearQr
       datos: {
-        'codigo_qr': codigoNumerico, // ← El backend espera 'codigo_qr' para el código numérico
+        'codigo_qr': codigoNumerico,
+        // ← El backend espera 'codigo_qr' para el código numérico
         'telefono': telefono,
         'area': area
       },
@@ -69,7 +70,7 @@ class AccessDatasource {
     );
 
     // Laravel responde { "data": [...] }  ← hay que desenvolver
-    final body  = respuesta.data as Map<String, dynamic>;
+    final body = respuesta.data as Map<String, dynamic>;
     final lista = body['data'] as List<dynamic>? ?? [];
 
     return lista
@@ -108,6 +109,16 @@ class AccessDatasource {
         'telefono': telefono,
         'area': area
       },
+    );
+  }
+
+  /// Notifica al anfitrión/solicitante que el visitante llegó fuera de horario
+  /// y necesita que se extienda el tiempo de acceso.
+  Future<void> solicitarExtension({required int idQr}) async {
+    AppLogger.info(_modulo, 'Solicitando extensión de tiempo — id_qr: $idQr');
+    await _apiClient.post(
+      '/vigilante/solicitar-extension',
+      datos: {'id_qr': idQr},
     );
   }
 }
