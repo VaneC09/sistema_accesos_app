@@ -3,9 +3,10 @@
 // Archivo   : manual_code_dialog.dart
 // Módulo    : features/access_control/presentation/dialogs
 // Autor     : Omega Company
-// Fecha     : 2026-05-25
-// Versión   : 1.0.0
+// Fecha     : 2026-05-28
+// Versión   : 1.1.0
 // Descripción: Diálogo para ingreso manual de código — RF-039, RF-033
+//              Fix: teclado numérico, solo dígitos permitidos
 // =============================================================================
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,24 +38,19 @@ class _ManualCodeDialogState extends State<ManualCodeDialog> {
   }
 
   void _confirmar() {
-    final valor = _controller.text.trim().toUpperCase();
+    // Solo dígitos — quitar guión si el usuario lo escribió de todos modos
+    final limpio = _controller.text.trim().replaceAll('-', '');
 
-    // Validar: exactamente 8 caracteres alfanuméricos (sin los guiones del prefijo)
-    if (valor.isEmpty) {
+    if (limpio.isEmpty) {
       setState(() => _error = 'Ingresa el código');
       return;
     }
-    if (valor.length != 9 || !valor.contains('-')) {
-      // Aceptar con o sin guión intermedio: "04916013" o "0491-6013"
-    }
-
-    // Ensamblar formato VIS-XXXX-XXXX
-    final limpio = valor.replaceAll('-', '');
     if (limpio.length != 8) {
-      setState(() => _error = 'El código debe tener 8 caracteres');
+      setState(() => _error = 'El código debe tener 8 dígitos');
       return;
     }
 
+    // Ensamblar formato VIS-XXXX-XXXX
     final codigoCompleto =
         'VIS-${limpio.substring(0, 4)}-${limpio.substring(4, 8)}';
     Navigator.of(context).pop(codigoCompleto);
@@ -69,11 +65,10 @@ class _ManualCodeDialogState extends State<ManualCodeDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Escribe los 8 caracteres del código',
+            'Escribe los 8 dígitos del código',
             style: TextStyle(fontSize: 13, color: Colors.grey),
           ),
           const SizedBox(height: AppSpacing.md),
-          // Prefijo VIS- fijo + campo de texto
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -103,17 +98,15 @@ class _ManualCodeDialogState extends State<ManualCodeDialog> {
                   ),
                 ),
               ),
-              // Campo editable: solo los 8 caracteres restantes
+              // Campo editable: solo 8 dígitos
               Expanded(
                 child: TextField(
                   controller: _controller,
                   autofocus: true,
-                  maxLength: 9, // permite "XXXX-XXXX" con guión opcional
-                  textCapitalization: TextCapitalization.characters,
+                  maxLength: 8,
+                  keyboardType: TextInputType.number,   // ← teclado numérico
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'[A-Z0-9\-]'),
-                    ),
+                    FilteringTextInputFormatter.digitsOnly, // ← solo dígitos
                   ],
                   style: const TextStyle(
                     fontFamily: 'monospace',
@@ -123,7 +116,7 @@ class _ManualCodeDialogState extends State<ManualCodeDialog> {
                   ),
                   decoration: InputDecoration(
                     counterText: '',
-                    hintText: '0000-0000',
+                    hintText: '00000000',
                     errorText: _error,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -153,7 +146,7 @@ class _ManualCodeDialogState extends State<ManualCodeDialog> {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Ejemplo: VIS-0491-6013',
+            'Ejemplo: VIS-0491-6013  →  04916013',
             style: TextStyle(
               fontSize: 11,
               color: Colors.grey.shade500,
