@@ -4,7 +4,7 @@
 // Módulo    : features/access_control/presentation/extension_dialog.dart
 // Autor     : Omega Company
 // Fecha     : 2026-05-29
-// Versión   : 2.0.0
+// Versión   : 2.1.0
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -59,17 +59,71 @@ class QrResultWidget extends StatelessWidget {
 
   // Determina el motivo de rechazo de forma clara y específica
   String _motivoLegible() {
-    final motivo = resultado.motivoRechazo ?? '';
-    if (motivo.contains('no encontrado'))  return 'El código QR no existe en el sistema.';
-    if (motivo.contains('cancelado'))      return 'Este QR fue cancelado por el solicitante o el sistema.';
-    if (motivo.contains('aún no es válido')) {
-      final desde = _formatFechaHora(resultado.vigenciaInicio);
-      return 'La visita no puede ingresar.\nVálido : $desde hrs';
+    final motivo = resultado.motivoRechazo?.toLowerCase().trim() ?? '';
+
+    // QR no encontrado en el sistema
+    if (motivo.contains('no encontrado') || motivo.contains('no existe')) {
+      return 'El código QR no existe en el sistema o fue eliminado.';
     }
-    if (motivo.contains('expirado') || motivo.contains('pasó')) {
-      final hasta = _formatFechaHora(resultado.vigenciaFin);
-      return 'El tiempo de visita expiró.\nVenció el: $hasta';
+
+    // QR cancelado (por solicitante, autorizador o sistema)
+    if (motivo.contains('cancelado')) {
+      return 'Este QR fue cancelado y ya no es válido para el acceso.';
     }
+
+    // QR rechazado — la solicitud fue rechazada por el autorizador
+    if (motivo.contains('rechazado') || motivo.contains('no autorizado')) {
+      return 'La solicitud de visita fue rechazada por el autorizador.';
+    }
+
+    // QR aún no válido — llegó antes de la ventana de acceso
+    if (motivo.contains('aún no es válido') || motivo.contains('no ha iniciado')) {
+      final desde = resultado.vigenciaInicio.isNotEmpty
+          ? _formatFechaHora(resultado.vigenciaInicio)
+          : null;
+      if (desde != null) {
+        return 'La visita aún no puede ingresar.\nPermitido a partir de: $desde hrs.';
+      }
+      return 'La visita aún no puede ingresar. Verifique la hora de inicio.';
+    }
+
+    // QR expirado — venció la vigencia final (ya incluye tolerancia_despues)
+    if (motivo.contains('expirado') ||
+        motivo.contains('venció') ||
+        motivo.contains('pasó') ||
+        motivo.contains('vencido')) {
+      final hasta = resultado.vigenciaFin.isNotEmpty
+          ? _formatFechaHora(resultado.vigenciaFin)
+          : null;
+      if (hasta != null) {
+        return 'El tiempo de visita ha expirado.\nVigencia hasta: $hasta hrs.';
+      }
+      return 'El tiempo de visita ha expirado.';
+    }
+
+    // QR ya utilizado — la entrada o salida ya fue registrada
+    if (motivo.contains('ya utilizado') ||
+        motivo.contains('ya fue usado') ||
+        motivo.contains('ya registrado')) {
+      return 'Este QR ya fue utilizado y no puede volver a emplearse.';
+    }
+
+    // QR inactivo / desactivado manualmente
+    if (motivo.contains('inactivo') || motivo.contains('desactivado')) {
+      return 'El código QR se encuentra inactivo. Contacte al administrador.';
+    }
+
+    // Solicitud pendiente — aún no ha sido autorizada
+    if (motivo.contains('pendiente') || motivo.contains('sin autorizar')) {
+      return 'La solicitud de visita aún no ha sido autorizada.';
+    }
+
+    // Acceso fuera del horario permitido
+    if (motivo.contains('horario') || motivo.contains('fuera de horario')) {
+      return 'El acceso no está permitido fuera del horario autorizado.';
+    }
+
+    // Fallback — motivo desconocido o genérico
     return motivo.isNotEmpty ? motivo : 'Acceso no autorizado.';
   }
 
@@ -108,7 +162,7 @@ class QrResultWidget extends StatelessWidget {
             ),
           ),
 
-          // ── Acción que se ejecutó ────────────────────────────────────────
+          // ── Accion registrada (entrada / salida) ─────────────────────────
           if (concedido) ...[
             const SizedBox(height: AppSpacing.xs),
             Center(
@@ -122,7 +176,7 @@ class QrResultWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
                 ),
                 child: Text(
-                  esEntrada ? 'ENTRADA REGISTRADA' : ' SALIDA REGISTRADA',
+                  esEntrada ? 'ENTRADA REGISTRADA' : 'SALIDA REGISTRADA',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -159,7 +213,7 @@ class QrResultWidget extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             _seccion(
               icono: Icons.location_on_rounded,
-              titulo: 'Área de destino',
+              titulo: 'Area de destino',
               contenido: resultado.lugarEncuentro,
             ),
           ],
@@ -168,7 +222,7 @@ class QrResultWidget extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             _seccion(
               icono: Icons.badge_rounded,
-              titulo: 'Solicitante / Anfitrión',
+              titulo: 'Solicitante / Anfitrion',
               contenido: resultado.departamentoSolicitante.isNotEmpty
                   ? '${resultado.nombreSolicitante}\n${resultado.departamentoSolicitante}'
                   : resultado.nombreSolicitante,
@@ -185,8 +239,7 @@ class QrResultWidget extends StatelessWidget {
             ),
           ],
 
-          // ── Motivo de rechazo claro ──────────────────────────────────────
-          // ── Motivo de rechazo claro ──────────────────────────────────────────────
+          // ── Motivo de rechazo ────────────────────────────────────────────
           if (!concedido) ...[
             const SizedBox(height: AppSpacing.md),
             Container(
@@ -199,8 +252,11 @@ class QrResultWidget extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline_rounded,
-                      color: AppColors.actionRed, size: 18),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    color: AppColors.actionRed,
+                    size: 18,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
@@ -216,47 +272,44 @@ class QrResultWidget extends StatelessWidget {
               ),
             ),
 
-            // Botón de solicitar extensión — solo si el QR existe y expiró
-            if (resultado.idQr > 0 &&
-                (resultado.motivoRechazo?.contains('expirado') == true ||
-                    resultado.motivoRechazo?.contains('pasó') == true)) ...[
-              const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _solicitarExtension(context),
-                  icon: const Icon(
-                    Icons.timer_outlined,
-                    color: AppColors.primaryCoral,
-                  ),
-                  label: const Text(
-                    'Notificar al anfitrión para extender tiempo',
-                    style: TextStyle(color: AppColors.primaryCoral),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primaryCoral),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            // TODO: Boton de extension de tiempo — oculto hasta implementacion completa
+            // if (resultado.idQr > 0 &&
+            //     (resultado.motivoRechazo?.contains('expirado') == true ||
+            //         resultado.motivoRechazo?.contains('pasó') == true)) ...[
+            //   const SizedBox(height: AppSpacing.md),
+            //   SizedBox(
+            //     width: double.infinity,
+            //     child: OutlinedButton.icon(
+            //       onPressed: () => _solicitarExtension(context),
+            //       icon: const Icon(
+            //         Icons.timer_outlined,
+            //         color: AppColors.primaryCoral,
+            //       ),
+            //       label: const Text(
+            //         'Notificar al anfitrion para extender tiempo',
+            //         style: TextStyle(color: AppColors.primaryCoral),
+            //       ),
+            //       style: OutlinedButton.styleFrom(
+            //         side: const BorderSide(color: AppColors.primaryCoral),
+            //         shape: RoundedRectangleBorder(
+            //           borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+            //         ),
+            //       ),
+            //     ),
+            //   ),
+            // ],
           ],
 
           const SizedBox(height: AppSpacing.xl),
 
-          // ── Botón de acción (solo si acceso concedido) ───────────────────
-          // NOTA: El escaneo ya registró la entrada/salida en el backend.
-          // Estos botones ya no son necesarios en el flujo de un solo paso.
-          // Se conservan ocultos por si se requiere flujo de dos pasos en el futuro.
-
-          // ── Botón nuevo escaneo ──────────────────────────────────────────
+          // ── Boton nuevo escaneo ──────────────────────────────────────────
           if (onNuevoEscaneo != null)
             TextButton.icon(
               onPressed: onNuevoEscaneo,
-              icon: const Icon(Icons.qr_code_scanner_rounded,
-                  color: AppColors.neutralGrey),
+              icon: const Icon(
+                Icons.qr_code_scanner_rounded,
+                color: AppColors.neutralGrey,
+              ),
               label: const Text(
                 'Nuevo escaneo',
                 style: TextStyle(color: AppColors.neutralGrey),
@@ -266,6 +319,7 @@ class QrResultWidget extends StatelessWidget {
       ),
     );
   }
+
   Future<void> _solicitarExtension(BuildContext context) async {
     try {
       final datasource = AccessDatasource();
@@ -274,7 +328,7 @@ class QrResultWidget extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Notificación enviada al anfitrión.'),
+            content: Text('Notificacion enviada al anfitrion.'),
             backgroundColor: Colors.green,
           ),
         );
@@ -283,13 +337,14 @@ class QrResultWidget extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No se pudo enviar la notificación. Intenta de nuevo.'),
+            content: Text('No se pudo enviar la notificacion. Intenta de nuevo.'),
             backgroundColor: Colors.red,
           ),
         );
       }
     }
   }
+
   // ── Ventana de acceso con tolerancia ─────────────────────────────────────
   String _buildVentanaAcceso() {
     try {
@@ -310,7 +365,7 @@ class QrResultWidget extends StatelessWidget {
           detalle += ', ';
         }
         if (resultado.toleranciaDespues > 0) {
-          detalle += '${resultado.toleranciaDespues} min después';
+          detalle += '${resultado.toleranciaDespues} min despues';
         }
         detalle += ')';
       }
@@ -321,7 +376,7 @@ class QrResultWidget extends StatelessWidget {
     }
   }
 
-  // ── Widget de sección de información ─────────────────────────────────────
+  // ── Widget de seccion de informacion ─────────────────────────────────────
   Widget _seccion({
     required IconData icono,
     required String titulo,
