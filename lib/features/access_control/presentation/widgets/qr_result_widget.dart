@@ -122,7 +122,7 @@ class QrResultWidget extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
                 ),
                 child: Text(
-                  esEntrada ? 'ENTRADA REGISTRADA' : '✔ SALIDA REGISTRADA',
+                  esEntrada ? 'ENTRADA REGISTRADA' : ' SALIDA REGISTRADA',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

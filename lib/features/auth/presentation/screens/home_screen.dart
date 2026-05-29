@@ -3,10 +3,11 @@
 // Archivo   : home_screen.dart
 // Módulo    : features/auth/presentation/screens
 // Autor     : Omega Company
-// Fecha     : 2026-05-25
-// Versión   : 1.0.1
+// Fecha     : 2026-05-29
+// Versión   : 1.0.2
 // Descripción: Pantalla principal con menú según rol del usuario.
 //              Fix: evita loading infinito después del login.
+//              Fix: usa roles múltiples para mostrar menú combinado.
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -71,12 +72,10 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
-          // 1. Si la autenticación es exitosa, muestra el menú
           if (state is AuthAuthenticated) {
             return _buildHome(context, state);
           }
 
-          // 2. Si ocurre un error, muestra el mensaje en pantalla para diagnóstico
           if (state is AuthError) {
             return Scaffold(
               backgroundColor: AppColors.baseSurface,
@@ -114,7 +113,6 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          // 3. Mientras procesa o carga, muestra el indicador visual
           return const Scaffold(
             backgroundColor: AppColors.baseSurface,
             body: Center(
@@ -166,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
                 ),
                 child: Text(
-                  _getRolLabel(state.rol),
+                  _getRolLabel(state),
                   style: const TextStyle(
                     color: AppColors.deepNavy,
                     fontSize: 12,
@@ -185,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisCount: 2,
                   crossAxisSpacing: AppSpacing.md,
                   mainAxisSpacing: AppSpacing.md,
-                  children: _getMenuItems(context, state.rol),
+                  children: _getMenuItems(context, state.roles),
                 ),
               ),
             ],
@@ -195,8 +193,30 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _getRolLabel(String rol) {
-    switch (rol) {
+  String _getRolLabel(AuthAuthenticated state) {
+    final roles = state.roles;
+
+    final esSolicitante = roles.contains('solicitante');
+    final esAutorizador = roles.contains('autorizador');
+    final esVigilante = roles.contains('vigilante');
+
+    if (esVigilante) {
+      return 'Vigilante';
+    }
+
+    if (esSolicitante && esAutorizador) {
+      return 'Empleado / Jefe de Área';
+    }
+
+    if (esAutorizador) {
+      return 'Jefe de Área / Autorizador';
+    }
+
+    if (esSolicitante) {
+      return 'Empleado';
+    }
+
+    switch (state.rol) {
       case 'solicitante':
         return 'Empleado';
       case 'autorizador':
@@ -204,150 +224,141 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'vigilante':
         return 'Vigilante';
       default:
-        return rol;
+        return state.rol;
     }
   }
 
-  List<Widget> _getMenuItems(BuildContext context, String rol) {
-    switch (rol) {
-      case 'solicitante':
-        return [
-          _MenuCard(
-            icono: Icons.add_circle_outline_rounded,
-            titulo: AppStrings.menuNuevaSolicitud,
-            color: AppColors.primaryCoral,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => NuevaSolicitudWrapper()),
-            ),
-          ),
-          _MenuCard(
-            icono: Icons.list_alt_rounded,
-            titulo: AppStrings.menuMisSolicitudes,
-            color: AppColors.headingDark,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const MisSolicitudesScreen()),
-            ),
-          ),
-        ];
+  List<Widget> _getMenuItems(BuildContext context, List<String> roles) {
+    final esSolicitante = roles.contains('solicitante');
+    final esAutorizador = roles.contains('autorizador');
+    final esVigilante = roles.contains('vigilante');
 
-      case 'autorizador':
-        return [
-          _MenuCard(
-            icono: Icons.add_circle_outline_rounded,
-            titulo: AppStrings.menuNuevaSolicitud,
-            color: AppColors.primaryCoral,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => NuevaSolicitudWrapper()),
-            ),
+    if (esVigilante) {
+      return [
+        _MenuCard(
+          icono: Icons.qr_code_scanner_rounded,
+          titulo: AppStrings.menuEscanearQr,
+          color: AppColors.primaryCoral,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const QrScannerScreen()),
           ),
-          _MenuCard(
-            icono: Icons.list_alt_rounded,
-            titulo: AppStrings.menuMisSolicitudes,
-            color: AppColors.headingDark,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const MisSolicitudesScreen()),
-            ),
+        ),
+        _MenuCard(
+          icono: Icons.list_alt_rounded,
+          titulo: AppStrings.menuVisitasHoy,
+          color: AppColors.headingDark,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const VisitasHoyScreen()),
           ),
-          _MenuCard(
-            icono: Icons.pending_actions_rounded,
-            titulo: AppStrings.menuAutorizarVisitas,
-            color: AppColors.successGreen,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AutorizacionesScreen()),
-            ),
-          ),
-          _MenuCard(
-            icono: Icons.notifications_outlined,
-            titulo: AppStrings.menuNotificaciones,
-            color: AppColors.headingSky,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            ),
-          ),
-        ];
+        ),
+        _MenuCard(
+          icono: Icons.edit_note_rounded,
+          titulo: AppStrings.menuRegistroManual,
+          color: AppColors.headingSky,
+          onTap: () async {
+            final codigo = await ManualCodeDialog.mostrar(context);
 
-      case 'vigilante':
-        return [
-          _MenuCard(
-            icono: Icons.qr_code_scanner_rounded,
-            titulo: AppStrings.menuEscanearQr,
-            color: AppColors.primaryCoral,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const QrScannerScreen()),
-            ),
-          ),
-          _MenuCard(
-            icono: Icons.list_alt_rounded,
-            titulo: AppStrings.menuVisitasHoy,
-            color: AppColors.headingDark,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const VisitasHoyScreen()),
-            ),
-          ),
-          _MenuCard(
-            icono: Icons.edit_note_rounded,
-            titulo: AppStrings.menuRegistroManual,
-            color: AppColors.headingSky,
-            onTap: () async {
-              final codigo = await ManualCodeDialog.mostrar(context);
-
-              if (codigo != null && context.mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => BlocProvider(
-                      create: (_) => AccessControlBloc(
-                        repository: AccessRepository(),
-                      ),
-                      child: _RegistroManualScreen(codigo: codigo),
+            if (codigo != null && context.mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BlocProvider(
+                    create: (_) => AccessControlBloc(
+                      repository: AccessRepository(),
                     ),
+                    child: _RegistroManualScreen(codigo: codigo),
                   ),
-                );
-              }
-            },
+                ),
+              );
+            }
+          },
+        ),
+        _MenuCard(
+          icono: Icons.help_outline_rounded,
+          titulo: 'Visita de Consulta',
+          color: AppColors.warningOrange,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ConsultaScreen()),
           ),
-          _MenuCard(
-            icono: Icons.help_outline_rounded,
-            titulo: 'Visita de Consulta',
-            color: AppColors.warningOrange,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ConsultaScreen()),
-            ),
-          ),
-        ];
-
-      default:
-      // Si llega un rol desconocido, muestra al menos el menú básico
-        return [
-          _MenuCard(
-            icono: Icons.add_circle_outline_rounded,
-            titulo: AppStrings.menuNuevaSolicitud,
-            color: AppColors.primaryCoral,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => NuevaSolicitudWrapper()),
-            ),
-          ),
-          _MenuCard(
-            icono: Icons.list_alt_rounded,
-            titulo: AppStrings.menuMisSolicitudes,
-            color: AppColors.headingDark,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const MisSolicitudesScreen()),
-            ),
-          ),
-        ];
+        ),
+      ];
     }
+
+    final items = <Widget>[];
+
+    if (esSolicitante || esAutorizador) {
+      items.addAll([
+        _MenuCard(
+          icono: Icons.add_circle_outline_rounded,
+          titulo: AppStrings.menuNuevaSolicitud,
+          color: AppColors.primaryCoral,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => NuevaSolicitudWrapper()),
+          ),
+        ),
+        _MenuCard(
+          icono: Icons.list_alt_rounded,
+          titulo: AppStrings.menuMisSolicitudes,
+          color: AppColors.headingDark,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MisSolicitudesScreen()),
+          ),
+        ),
+      ]);
+    }
+
+    if (esAutorizador) {
+      items.addAll([
+        _MenuCard(
+          icono: Icons.pending_actions_rounded,
+          titulo: AppStrings.menuAutorizarVisitas,
+          color: AppColors.successGreen,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AutorizacionesScreen()),
+          ),
+        ),
+        _MenuCard(
+          icono: Icons.notifications_outlined,
+          titulo: AppStrings.menuNotificaciones,
+          color: AppColors.headingSky,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+          ),
+        ),
+      ]);
+    }
+
+    if (items.isEmpty) {
+      return [
+        _MenuCard(
+          icono: Icons.add_circle_outline_rounded,
+          titulo: AppStrings.menuNuevaSolicitud,
+          color: AppColors.primaryCoral,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => NuevaSolicitudWrapper()),
+          ),
+        ),
+        _MenuCard(
+          icono: Icons.list_alt_rounded,
+          titulo: AppStrings.menuMisSolicitudes,
+          color: AppColors.headingDark,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MisSolicitudesScreen()),
+          ),
+        ),
+      ];
+    }
+
+    return items;
   }
 
   Future<void> _onLogoutPressed(BuildContext context) async {
@@ -363,7 +374,9 @@ class _HomeScreenState extends State<HomeScreen> {
 class _RegistroManualScreen extends StatefulWidget {
   final String codigo;
 
-  const _RegistroManualScreen({required this.codigo});
+  const _RegistroManualScreen({
+    required this.codigo,
+  });
 
   @override
   State<_RegistroManualScreen> createState() => _RegistroManualScreenState();

@@ -3,73 +3,96 @@
 // Archivo   : auth_bloc.dart
 // Módulo    : features/auth/bloc
 // Autor     : Omega Company
-// Fecha     : 2026-05-27
-// Versión   : 1.2.0
+// Fecha     : 2026-05-29
+// Versión   : 1.3.0
 // Descripción: Gestión de autenticación para todos los roles.
-//              Cambios v1.2 (solo vigilante):
-//                - LoginVigilante arranca iniciarJornada() + timer periódico
-//                - Timer revisa inactividad Y jornada cada 60 s
-//                - AuthUnauthenticated incluye motivo (SesionEstado)
-//                - LogoutRequested / SessionExpired limpian sesión vigilante
-//              Flujos de LoginSubmitted, VerificarSesion (empleado) sin cambios.
+//              Cambios:
+//                - Conserva flujo de vigilante con telefono, area y timer.
+//                - Agrega soporte para roles múltiples.
 // =============================================================================
 
 import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import '../business/auth_validator.dart';
 import '../business/auth_session_service.dart';
 import '../business/sesion_estado.dart';
 import '../data/auth_repository.dart';
 import '../../../core/errors/app_exceptions.dart';
 import '../../../core/errors/app_logger.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/config/app_config.dart';
+
 // ── Eventos ──────────────────────────────────────────────────────────────────
 abstract class AuthEvent extends Equatable {
   const AuthEvent();
-  @override List<Object> get props => [];
+
+  @override
+  List<Object> get props => [];
 }
 
 class LoginSubmitted extends AuthEvent {
   final String usuario;
   final String contrasena;
-  const LoginSubmitted({required this.usuario, required this.contrasena});
-  @override List<Object> get props => [usuario, contrasena];
+
+  const LoginSubmitted({
+    required this.usuario,
+    required this.contrasena,
+  });
+
+  @override
+  List<Object> get props => [usuario, contrasena];
 }
 
 class LoginVigilante extends AuthEvent {
   final String telefono;
   final String area;
-  const LoginVigilante({required this.telefono, required this.area});
-  @override List<Object> get props => [telefono, area];
+
+  const LoginVigilante({
+    required this.telefono,
+    required this.area,
+  });
+
+  @override
+  List<Object> get props => [telefono, area];
 }
 
 class LogoutRequested extends AuthEvent {}
-class SessionExpired  extends AuthEvent {}
+
+class SessionExpired extends AuthEvent {}
+
 class VerificarSesion extends AuthEvent {}
-class _VigilanteTick  extends AuthEvent {}
+
+class _VigilanteTick extends AuthEvent {}
 
 // ── Estados ──────────────────────────────────────────────────────────────────
 abstract class AuthState extends Equatable {
   const AuthState();
-  @override List<Object> get props => [];
+
+  @override
+  List<Object> get props => [];
 }
 
-class AuthInitial        extends AuthState {}
-class AuthLoading        extends AuthState {}
-class AuthBlocked        extends AuthState {}
+class AuthInitial extends AuthState {}
+
+class AuthLoading extends AuthState {}
+
+class AuthBlocked extends AuthState {}
 
 class AuthAuthenticated extends AuthState {
   final String rol;
+  final List<String> roles;
   final String nombre;
   final String correoPersonal;
   final String correoPuesto;
-  final int    idEmpleado;
-  final int    idDepartamento;
+  final int idEmpleado;
+  final int idDepartamento;
 
   const AuthAuthenticated({
     required this.rol,
+    required this.roles,
     required this.nombre,
     required this.correoPersonal,
     required this.correoPuesto,
@@ -78,37 +101,54 @@ class AuthAuthenticated extends AuthState {
   });
 
   @override
-  List<Object> get props =>
-      [rol, nombre, correoPersonal, correoPuesto, idEmpleado, idDepartamento];
+  List<Object> get props => [
+    rol,
+    roles,
+    nombre,
+    correoPersonal,
+    correoPuesto,
+    idEmpleado,
+    idDepartamento,
+  ];
 }
 
 class AuthError extends AuthState {
   final String mensaje;
-  const AuthError({required this.mensaje});
-  @override List<Object> get props => [mensaje];
+
+  const AuthError({
+    required this.mensaje,
+  });
+
+  @override
+  List<Object> get props => [mensaje];
 }
 
 class AuthUnauthenticated extends AuthState {
   final SesionEstado? motivo;
-  const AuthUnauthenticated({this.motivo});
-  @override List<Object> get props => [motivo?.name ?? ''];
+
+  const AuthUnauthenticated({
+    this.motivo,
+  });
+
+  @override
+  List<Object> get props => [motivo?.name ?? ''];
 }
 
 // ── Bloc ─────────────────────────────────────────────────────────────────────
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static const String _modulo = 'AUTH_BLOC';
 
-  final AuthRepository    _repository;
+  final AuthRepository _repository;
   final AuthSessionService _sessionService;
 
-  int   _intentosFallidos = 0;
+  int _intentosFallidos = 0;
   static const int _maxIntentos = 5;
   Timer? _timerVigilante;
 
   AuthBloc({
-    AuthRepository?     repository,
+    AuthRepository? repository,
     AuthSessionService? sessionService,
-  })  : _repository    = repository    ?? AuthRepository(),
+  })  : _repository = repository ?? AuthRepository(),
         _sessionService = sessionService ?? AuthSessionService(),
         super(AuthInitial()) {
     on<LoginSubmitted>(_onLoginSubmitted);
@@ -119,7 +159,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<_VigilanteTick>(_onVigilanteTick);
   }
 
-  // ── Timer ─────────────────────────────────────────────────────────────────
+  // ── Timer vigilante ────────────────────────────────────────────────────────
   void _arrancarTimer() {
     _timerVigilante?.cancel();
     _timerVigilante = Timer.periodic(
@@ -133,84 +173,113 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _timerVigilante = null;
   }
 
-  Future<void> registrarActividadVigilante() async =>
-      _sessionService.registrarActividad();
+  Future<void> registrarActividadVigilante() async {
+    await _sessionService.registrarActividad();
+  }
 
-  // ── Login empleado — SIN CAMBIOS ─────────────────────────────────────────
+  // ── Login empleado / solicitante / autorizador ─────────────────────────────
   Future<void> _onLoginSubmitted(
-      LoginSubmitted event, Emitter<AuthState> emit) async {
+      LoginSubmitted event,
+      Emitter<AuthState> emit,
+      ) async {
     try {
       AuthValidator.validarLogin(event.usuario, event.contrasena);
-      if (_intentosFallidos >= _maxIntentos) { emit(AuthBlocked()); return; }
+
+      if (_intentosFallidos >= _maxIntentos) {
+        emit(AuthBlocked());
+        return;
+      }
 
       emit(AuthLoading());
-      final modelo = await _repository.login(event.usuario, event.contrasena);
+
+      final modelo = await _repository.login(
+        event.usuario,
+        event.contrasena,
+      );
+
       _intentosFallidos = 0;
+
       AppLogger.info(_modulo, 'Login exitoso: ${event.usuario}');
 
       emit(AuthAuthenticated(
-        rol: modelo.rol, nombre: modelo.nombre,
-        correoPersonal: modelo.correoPersonal, correoPuesto: modelo.correoPuesto,
-        idEmpleado: modelo.idEmpleado, idDepartamento: modelo.idDepartamento,
+        rol: modelo.rol,
+        roles: modelo.roles,
+        nombre: modelo.nombre,
+        correoPersonal: modelo.correoPersonal,
+        correoPuesto: modelo.correoPuesto,
+        idEmpleado: modelo.idEmpleado,
+        idDepartamento: modelo.idDepartamento,
       ));
     } on ValidationException catch (e) {
       emit(AuthError(mensaje: e.mensaje));
     } on UnauthorizedException {
       _intentosFallidos++;
+
       if (_intentosFallidos >= _maxIntentos) {
         emit(AuthBlocked());
       } else {
-        emit(const AuthError(mensaje: 'Credenciales inválidas. Intente nuevamente'));
+        emit(const AuthError(
+          mensaje: 'Credenciales inválidas. Intente nuevamente',
+        ));
       }
     } on AppException catch (e) {
       emit(AuthError(mensaje: e.mensaje));
     } catch (e) {
       AppLogger.error(_modulo, 'Error inesperado: $e');
-      emit(const AuthError(mensaje: 'Error inesperado. Contacte al administrador'));
+      emit(const AuthError(
+        mensaje: 'Error inesperado. Contacte al administrador',
+      ));
     }
   }
 
-  // ── Login vigilante — solo guarda local, arranca jornada ─────────────────
-  // Reemplazar SOLO el método _onLoginVigilante:
-
+  // ── Login vigilante ────────────────────────────────────────────────────────
   Future<void> _onLoginVigilante(
-      LoginVigilante event, Emitter<AuthState> emit) async {
+      LoginVigilante event,
+      Emitter<AuthState> emit,
+      ) async {
     try {
       AuthValidator.validarLoginVigilante(event.telefono, event.area);
+
       emit(AuthLoading());
 
       final modeloRaw = await _repository.loginVigilante(
-          event.telefono, event.area);
+        event.telefono,
+        event.area,
+      );
 
-      // ── Inyectar teléfono y área en el modelo (el servidor no los devuelve)
       final modelo = modeloRaw.copyWithVigilante(
         telefono: event.telefono,
-        area:     event.area,
+        area: event.area,
       );
 
-      // ── Persistir en SecureStorage para que QrScannerScreen los lea ──────
       const storage = FlutterSecureStorage();
+
       await storage.write(
-        key:   AppConfig.claveTelefonoVigilante,
+        key: AppConfig.claveTelefonoVigilante,
         value: event.telefono,
       );
+
       await storage.write(
-        key:   AppConfig.claveAreaVigilante,
+        key: AppConfig.claveAreaVigilante,
         value: event.area,
       );
 
       await _sessionService.iniciarJornada();
+
       _arrancarTimer();
 
-      AppLogger.info(_modulo,
-          'Vigilante identificado — ${event.area} | tel: ${event.telefono}');
+      AppLogger.info(
+        _modulo,
+        'Vigilante identificado — ${event.area} | tel: ${event.telefono}',
+      );
 
       emit(AuthAuthenticated(
-        rol:            modelo.rol,
-        nombre:         modelo.nombre,
+        rol: modelo.rol,
+        roles: modelo.roles,
+        nombre: modelo.nombre,
         correoPersonal: modelo.correoPersonal,
-        correoPuesto:   modelo.correoPuesto,
-        idEmpleado:     modelo.idEmpleado,
+        correoPuesto: modelo.correoPuesto,
+        idEmpleado: modelo.idEmpleado,
         idDepartamento: modelo.idDepartamento,
       ));
     } on ValidationException catch (e) {
@@ -220,73 +289,110 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e) {
       AppLogger.error(_modulo, 'Error inesperado vigilante: $e');
       emit(const AuthError(
-          mensaje: 'No fue posible registrar el acceso. Intente nuevamente'));
+        mensaje: 'No fue posible registrar el acceso. Intente nuevamente',
+      ));
     }
   }
 
-  // En _onLogoutRequested, añadir el borrado de claves vigilante:
-
+  // ── Logout ─────────────────────────────────────────────────────────────────
   Future<void> _onLogoutRequested(
-      LogoutRequested event, Emitter<AuthState> emit) async {
-    try { await _repository.logout(); } catch (_) {}
+      LogoutRequested event,
+      Emitter<AuthState> emit,
+      ) async {
+    try {
+      await _repository.logout();
+    } catch (_) {}
+
     _intentosFallidos = 0;
+
     _detenerTimer();
+
     await _sessionService.limpiarSesion();
 
-    // ── Limpiar datos del vigilante del almacenamiento seguro ─────────────
     const storage = FlutterSecureStorage();
+
     await storage.delete(key: AppConfig.claveTelefonoVigilante);
     await storage.delete(key: AppConfig.claveAreaVigilante);
 
     emit(const AuthUnauthenticated());
   }
 
-  void _onSessionExpired(SessionExpired event, Emitter<AuthState> emit) {
+  void _onSessionExpired(
+      SessionExpired event,
+      Emitter<AuthState> emit,
+      ) {
     _detenerTimer();
     _sessionService.limpiarSesion();
     emit(const AuthUnauthenticated());
   }
 
+  // ── Verificar sesión guardada ──────────────────────────────────────────────
   Future<void> _onVerificarSesion(
-      VerificarSesion event, Emitter<AuthState> emit) async {
+      VerificarSesion event,
+      Emitter<AuthState> emit,
+      ) async {
     try {
       final modelo = await _repository.obtenerSesionActiva();
-      if (modelo == null) { emit(const AuthUnauthenticated()); return; }
+
+      if (modelo == null) {
+        emit(const AuthUnauthenticated());
+        return;
+      }
 
       if (modelo.rol == 'vigilante') {
         final estado = await _sessionService.esSesionValida();
+
         if (!estado.esValida) {
           await _sessionService.limpiarSesion();
           emit(AuthUnauthenticated(motivo: estado));
           return;
         }
+
         _arrancarTimer();
       }
 
       emit(AuthAuthenticated(
-        rol: modelo.rol, nombre: modelo.nombre,
-        correoPersonal: modelo.correoPersonal, correoPuesto: modelo.correoPuesto,
-        idEmpleado: modelo.idEmpleado, idDepartamento: modelo.idDepartamento,
+        rol: modelo.rol,
+        roles: modelo.roles,
+        nombre: modelo.nombre,
+        correoPersonal: modelo.correoPersonal,
+        correoPuesto: modelo.correoPuesto,
+        idEmpleado: modelo.idEmpleado,
+        idDepartamento: modelo.idDepartamento,
       ));
     } catch (_) {
       emit(const AuthUnauthenticated());
     }
   }
 
+  // ── Timer vigilante ────────────────────────────────────────────────────────
   Future<void> _onVigilanteTick(
-      _VigilanteTick event, Emitter<AuthState> emit) async {
+      _VigilanteTick event,
+      Emitter<AuthState> emit,
+      ) async {
     if (state is! AuthAuthenticated) return;
+
     if ((state as AuthAuthenticated).rol != 'vigilante') return;
 
     final estado = await _sessionService.esSesionValida();
+
     if (!estado.esValida) {
-      AppLogger.warning(_modulo, 'Sesión vigilante expirada: ${estado.name}');
+      AppLogger.warning(
+        _modulo,
+        'Sesión vigilante expirada: ${estado.name}',
+      );
+
       _detenerTimer();
+
       await _sessionService.limpiarSesion();
+
       emit(AuthUnauthenticated(motivo: estado));
     }
   }
 
   @override
-  Future<void> close() { _detenerTimer(); return super.close(); }
+  Future<void> close() {
+    _detenerTimer();
+    return super.close();
+  }
 }
