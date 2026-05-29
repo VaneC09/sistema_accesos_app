@@ -4,15 +4,11 @@
 // Módulo    : root
 // Autor     : Omega Company
 // Fecha     : 2026-05-29
-// Versión   : 1.1.0
-// Descripción: Arranca polling de notificaciones al autenticarse — RF-023
-//
-// Cambios v1.1:
-//  - BlocListener<AuthBloc> inicia IniciarPollingNotificaciones al autenticarse
-//    y dispara DetenerPollingNotificaciones + LimpiarNotificaciones al salir.
-//  - NotificationService.instancia.onNotificacionTocada conecta con el
-//    NotificationBloc para que los toques de notificación local naveguen
-//    a la pantalla correcta.
+// Versión   : 1.2.0
+// Descripción: El polling de notificaciones solo se activa para roles con
+//              token Sanctum real (solicitante / autorizador).
+//              El vigilante usa 'vigilante-local' y NO tiene acceso a
+//              /notificaciones (requiere auth:sanctum).
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -48,8 +44,6 @@ class SistemaAccesosApp extends StatelessWidget {
             repository: AuthRepository(),
           )..add(VerificarSesion()),
         ),
-        // NotificationBloc global — el polling lo arranca _AppListener
-        // una vez que el usuario está autenticado.
         BlocProvider(
           create: (_) => NotificationBloc(),
         ),
@@ -59,8 +53,10 @@ class SistemaAccesosApp extends StatelessWidget {
   }
 }
 
-/// Envuelve MaterialApp para poder escuchar AuthBloc y NotificationBloc
-/// antes de que se construya cualquier ruta.
+// =============================================================================
+// _AppListener — controla el polling según el rol del usuario autenticado
+// =============================================================================
+
 class _AppListener extends StatefulWidget {
   const _AppListener();
 
@@ -69,35 +65,48 @@ class _AppListener extends StatefulWidget {
 }
 
 class _AppListenerState extends State<_AppListener> {
-  /// Navegador global para navegar desde callbacks fuera del árbol de extension_dialog.dart
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
-
-    // Cuando el usuario toca una notificación local (incluso con la app en
-    // background), el servicio llama este callback.
     NotificationService.instancia.onNotificacionTocada =
         _manejarToqueNotificacion;
+  }
+
+  /// Solo solicitante y autorizador tienen token Sanctum válido.
+  /// El vigilante guarda 'vigilante-local' — el endpoint /notificaciones
+  /// requiere auth:sanctum y devuelve 401 con ese token.
+  bool _rolUsaNotificaciones(String rol) => rol != 'vigilante';
+
+  void _manejarCambioAuth(BuildContext context, AuthState authState) {
+    if (authState is AuthAuthenticated) {
+      if (_rolUsaNotificaciones(authState.rol)) {
+        // Solicitante o autorizador → arrancar polling
+        context.read<NotificationBloc>().add(
+          const IniciarPollingNotificaciones(
+            intervalo: Duration(seconds: 15),
+          ),
+        );
+      } else {
+        // Vigilante → asegurarse de que el polling esté detenido
+        context.read<NotificationBloc>().add(DetenerPollingNotificaciones());
+      }
+    } else if (authState is AuthUnauthenticated) {
+      // Cierre de sesión → detener polling y limpiar estado
+      context.read<NotificationBloc>()
+        ..add(DetenerPollingNotificaciones())
+        ..add(LimpiarNotificaciones());
+    }
   }
 
   void _manejarToqueNotificacion(NotificationModel notificacion) {
     final nav = _navigatorKey.currentState;
     if (nav == null) return;
 
-    if (notificacion.tipo == TipoNotificacion.visitanteIngreso) {
-      // Ir directamente a visitas activas
-      nav.push(MaterialPageRoute(
-        builder: (_) => BlocProvider.value(
-          value: context.read<NotificationBloc>(),
-          child: const VisitConfirmationScreen(),
-        ),
-      ));
-    } else if (notificacion.tipo == TipoNotificacion.solicitudExtension ||
+    if (notificacion.tipo == TipoNotificacion.visitanteIngreso ||
+        notificacion.tipo == TipoNotificacion.solicitudExtension ||
         notificacion.tipo == TipoNotificacion.qrExpiradoTolerancia) {
-      // También ir a visitas activas — el diálogo de extensión
-      // se abre automáticamente cuando el BlocListener detecta el estado.
       nav.push(MaterialPageRoute(
         builder: (_) => BlocProvider.value(
           value: context.read<NotificationBloc>(),
@@ -110,21 +119,7 @@ class _AppListenerState extends State<_AppListener> {
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
-      listener: (context, authState) {
-        if (authState is AuthAuthenticated) {
-          // Usuario autenticado → arrancar polling
-          context.read<NotificationBloc>().add(
-            const IniciarPollingNotificaciones(
-              intervalo: Duration(seconds: 15),
-            ),
-          );
-        } else if (authState is AuthUnauthenticated) {
-          // Sesión cerrada → detener polling y limpiar estado
-          context.read<NotificationBloc>()
-            ..add(DetenerPollingNotificaciones())
-            ..add(LimpiarNotificaciones());
-        }
-      },
+      listener: _manejarCambioAuth,
       child: MaterialApp(
         title: 'Sistema de Accesos ITT',
         theme: AppTheme.lightTheme,
@@ -158,28 +153,21 @@ class _SplashScreenState extends State<_SplashScreen> {
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     final state = context.read<AuthBloc>().state;
-    if (state is AuthAuthenticated) {
-      _irAHome();
-    } else if (state is AuthUnauthenticated) {
-      _irALogin();
-    }
+    if (state is AuthAuthenticated) _irAHome();
+    if (state is AuthUnauthenticated) _irALogin();
   }
 
-  void _irAHome() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => HomeScreen()),
-          (route) => false,
-    );
-  }
+  void _irAHome() => Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (_) => HomeScreen()),
+        (route) => false,
+  );
 
-  void _irALogin() {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-    );
-  }
+  void _irALogin() => Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+  );
 
   @override
   Widget build(BuildContext context) {
