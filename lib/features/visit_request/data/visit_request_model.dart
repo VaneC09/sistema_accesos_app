@@ -137,6 +137,8 @@ class VisitRequestModel {
         return 'Autorizada';
       case 3:
         return 'Rechazada';
+      case 4:
+        return 'Cancelada';
       default:
         return 'Pendiente';
     }

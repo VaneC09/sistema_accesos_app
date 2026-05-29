@@ -49,6 +49,7 @@ class _MisSolicitudesViewState extends State<_MisSolicitudesView> {
     'Pendiente',
     'Autorizada',
     'Rechazada',
+    'Cancelada',
   ];
 
   @override
