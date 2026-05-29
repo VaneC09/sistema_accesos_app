@@ -39,21 +39,22 @@ class QrScanResultModel {
   bool get llegaAnticipado => false;
 
   factory QrScanResultModel.fromJson(Map<String, dynamic> json) {
-    final data      = json['data'] as Map<String, dynamic>? ?? json;
-    final visitante = data['visitante']  as Map<String, dynamic>? ?? {};
-    final solicitud = data['solicitud']  as Map<String, dynamic>? ?? {};
+    // El datasource ya desenvuelve 'data' antes de llamar aquí.
+    // json ES el objeto plano: { id_qr, acceso_concedido, visitante, solicitud, ... }
+    final visitante = json['visitante'] as Map<String, dynamic>? ?? {};
+    final solicitud = json['solicitud'] as Map<String, dynamic>? ?? {};
 
     return QrScanResultModel(
-      idQr:              data['id_qr']               as int?    ?? 0,
-      folio:             'QR-${data['id_qr'] ?? 0}',
-      nombreVisitante:   '${visitante['nombre'] ?? ''} ${visitante['apellidos'] ?? ''}'.trim(),
-      correoVisitante:   visitante['correo_personal'] as String? ?? '',
-      motivoVisita:      solicitud['motivo_visita']   as String? ?? '',
-      vigenciaInicio:    solicitud['vigencia_inicio'] as String? ?? '',
-      vigenciaFin:       solicitud['vigencia_final']  as String? ?? '',
-      accionDisponible:  data['accion_disponible']    as String? ?? 'entrada',
-      accesoConcedido:   data['acceso_concedido']     as bool?   ?? true,
-      motivoRechazo:     data['motivo_rechazo']       as String?,
+      idQr:             json['id_qr']              as int?    ?? 0,
+      folio:            'QR-${json['id_qr'] ?? 0}',
+      nombreVisitante:  '${visitante['nombre'] ?? ''} ${visitante['apellidos'] ?? ''}'.trim(),
+      correoVisitante:  visitante['correo_personal'] as String? ?? '',
+      motivoVisita:     solicitud['motivo_visita']   as String? ?? '',
+      vigenciaInicio:   solicitud['vigencia_inicio'] as String? ?? '',
+      vigenciaFin:      solicitud['vigencia_final']  as String? ?? '',
+      accionDisponible: json['accion_disponible']    as String? ?? 'entrada',
+      accesoConcedido:  json['acceso_concedido']     as bool?   ?? false,
+      motivoRechazo:    json['motivo_rechazo']       as String?,
     );
   }
 }

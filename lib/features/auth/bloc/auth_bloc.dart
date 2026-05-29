@@ -23,7 +23,8 @@ import '../business/sesion_estado.dart';
 import '../data/auth_repository.dart';
 import '../../../core/errors/app_exceptions.dart';
 import '../../../core/errors/app_logger.dart';
-
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../core/config/app_config.dart';
 // ── Eventos ──────────────────────────────────────────────────────────────────
 abstract class AuthEvent extends Equatable {
   const AuthEvent();
@@ -170,23 +171,47 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   // ── Login vigilante — solo guarda local, arranca jornada ─────────────────
+  // Reemplazar SOLO el método _onLoginVigilante:
+
   Future<void> _onLoginVigilante(
       LoginVigilante event, Emitter<AuthState> emit) async {
     try {
       AuthValidator.validarLoginVigilante(event.telefono, event.area);
       emit(AuthLoading());
 
-      final modelo = await _repository.loginVigilante(event.telefono, event.area);
+      final modeloRaw = await _repository.loginVigilante(
+          event.telefono, event.area);
+
+      // ── Inyectar teléfono y área en el modelo (el servidor no los devuelve)
+      final modelo = modeloRaw.copyWithVigilante(
+        telefono: event.telefono,
+        area:     event.area,
+      );
+
+      // ── Persistir en SecureStorage para que QrScannerScreen los lea ──────
+      const storage = FlutterSecureStorage();
+      await storage.write(
+        key:   AppConfig.claveTelefonoVigilante,
+        value: event.telefono,
+      );
+      await storage.write(
+        key:   AppConfig.claveAreaVigilante,
+        value: event.area,
+      );
 
       await _sessionService.iniciarJornada();
       _arrancarTimer();
 
-      AppLogger.info(_modulo, 'Vigilante identificado — ${event.area}');
+      AppLogger.info(_modulo,
+          'Vigilante identificado — ${event.area} | tel: ${event.telefono}');
 
       emit(AuthAuthenticated(
-        rol: modelo.rol, nombre: modelo.nombre,
-        correoPersonal: modelo.correoPersonal, correoPuesto: modelo.correoPuesto,
-        idEmpleado: modelo.idEmpleado, idDepartamento: modelo.idDepartamento,
+        rol:            modelo.rol,
+        nombre:         modelo.nombre,
+        correoPersonal: modelo.correoPersonal,
+        correoPuesto:   modelo.correoPuesto,
+        idEmpleado:     modelo.idEmpleado,
+        idDepartamento: modelo.idDepartamento,
       ));
     } on ValidationException catch (e) {
       emit(AuthError(mensaje: e.mensaje));
@@ -199,13 +224,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
+  // En _onLogoutRequested, añadir el borrado de claves vigilante:
+
   Future<void> _onLogoutRequested(
       LogoutRequested event, Emitter<AuthState> emit) async {
-    // logout() en el repository ya sabe que el vigilante no llama al backend
     try { await _repository.logout(); } catch (_) {}
     _intentosFallidos = 0;
     _detenerTimer();
     await _sessionService.limpiarSesion();
+
+    // ── Limpiar datos del vigilante del almacenamiento seguro ─────────────
+    const storage = FlutterSecureStorage();
+    await storage.delete(key: AppConfig.claveTelefonoVigilante);
+    await storage.delete(key: AppConfig.claveAreaVigilante);
+
     emit(const AuthUnauthenticated());
   }
 

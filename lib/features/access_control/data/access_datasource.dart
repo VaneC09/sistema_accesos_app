@@ -30,8 +30,10 @@ class AccessDatasource {
       '/vigilante/escanear',
       datos: { 'codigo_qr': codigoQr, 'telefono': telefono, 'area': area },
     );
-    return QrScanResultModel.fromJson(respuesta.data as Map<String, dynamic>);
-  }
+    AppLogger.info(_modulo, 'Respuesta raw escanear: ${respuesta.data}');
+    final body = respuesta.data as Map<String, dynamic>;
+    return QrScanResultModel.fromJson(body['data'] as Map<String, dynamic>);
+  } // <-- ¡AQUÍ FALTABA ESTA LLAVE DE CIERRE!
 
   /// Registro manual: Mapea a la misma ruta de escanear utilizando 'codigo_qr'
   Future<QrScanResultModel> registroManual({
