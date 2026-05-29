@@ -1,13 +1,26 @@
-// =============================================================================
+/// =============================================================================
 // Proyecto  : Sistema de Gestión de Accesos y Visitas
 // Archivo   : notification_bloc.dart
 // Módulo    : features/notifications/bloc
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
-// Versión   : 1.0.0
-// Descripción: Gestor de estado de notificaciones — RF-023
+// Fecha     : 2026-05-29
+// Versión   : 2.0.0
+// Descripción: Extiende v1.0.0 — agrega polling, NuevaNotificacionRecibida
+//              y AutorizarExtensionQr — RF-023, RF-025
+//
+// Cambios respecto a v1:
+//  + IniciarPollingNotificaciones / DetenerPollingNotificaciones
+//  + _TickPolling (evento interno)
+//  + MarcarNotificacionLeida  (persiste en backend; MarcarComoLeida se conserva)
+//  + MarcarTodasLeidas
+//  + AutorizarExtensionQr
+//  + Estado NuevaNotificacionRecibida
+//  + Estado ExtensionQrResultado
+//  Conserva: CargarNotificaciones, NotificacionRecibida, MarcarComoLeida,
+//            LimpiarNotificaciones, NotificacionesLoaded, NotificationError
 // =============================================================================
 
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../data/notification_model.dart';
@@ -19,45 +32,77 @@ import '../../../core/errors/app_logger.dart';
 
 abstract class NotificationEvent extends Equatable {
   const NotificationEvent();
-
   @override
   List<Object?> get props => [];
 }
+
+// ── Eventos que ya existían (sin cambios) ────────────────────────────────────
 
 class CargarNotificaciones extends NotificationEvent {}
 
 class NotificacionRecibida extends NotificationEvent {
   final NotificationModel notificacion;
-
-  const NotificacionRecibida({
-    required this.notificacion,
-  });
-
+  const NotificacionRecibida({required this.notificacion});
   @override
   List<Object?> get props => [notificacion];
 }
 
+/// Alias original — conservado para no romper pantallas existentes.
 class MarcarComoLeida extends NotificationEvent {
   final String idNotificacion;
-
-  const MarcarComoLeida({
-    required this.idNotificacion,
-  });
-
+  const MarcarComoLeida({required this.idNotificacion});
   @override
   List<Object?> get props => [idNotificacion];
 }
 
 class LimpiarNotificaciones extends NotificationEvent {}
 
+// ── Eventos nuevos ────────────────────────────────────────────────────────────
+
+/// Inicia el polling periódico (llama a la API cada [intervalo]).
+class IniciarPollingNotificaciones extends NotificationEvent {
+  final Duration intervalo;
+  const IniciarPollingNotificaciones({
+    this.intervalo = const Duration(seconds: 15),
+  });
+  @override
+  List<Object?> get props => [intervalo];
+}
+
+/// Detiene el polling (ej. al cerrar sesión).
+class DetenerPollingNotificaciones extends NotificationEvent {}
+
+/// Igual que [MarcarComoLeida] pero también persiste en el backend.
+class MarcarNotificacionLeida extends NotificationEvent {
+  final String idNotificacion;
+  const MarcarNotificacionLeida({required this.idNotificacion});
+  @override
+  List<Object?> get props => [idNotificacion];
+}
+
+/// Marca todas las notificaciones como leídas en backend y estado local.
+class MarcarTodasLeidas extends NotificationEvent {}
+
+/// El anfitrión autoriza la extensión del QR de la solicitud [idSolicitud].
+class AutorizarExtensionQr extends NotificationEvent {
+  final int idSolicitud;
+  const AutorizarExtensionQr({required this.idSolicitud});
+  @override
+  List<Object?> get props => [idSolicitud];
+}
+
+/// Evento interno del timer — no usar desde la UI.
+class _TickPolling extends NotificationEvent {}
+
 // ── Estados ──────────────────────────────────────────────────────────────────
 
 abstract class NotificationState extends Equatable {
   const NotificationState();
-
   @override
   List<Object?> get props => [];
 }
+
+// ── Estados que ya existían (sin cambios) ────────────────────────────────────
 
 class NotificationInitial extends NotificationState {}
 
@@ -78,32 +123,82 @@ class NotificacionesLoaded extends NotificationState {
 
 class NotificationError extends NotificationState {
   final String mensaje;
-
-  const NotificationError({
-    required this.mensaje,
-  });
-
+  const NotificationError({required this.mensaje});
   @override
   List<Object?> get props => [mensaje];
 }
 
-// ── Bloc ─────────────────────────────────────────────────────────────────────
+// ── Estados nuevos ────────────────────────────────────────────────────────────
+
+/// Se emite cuando el polling detecta una notificación nueva de tipo
+/// [visitante_ingreso], [solicitud_extension] o [qr_expirado_tolerancia].
+class NuevaNotificacionRecibida extends NotificationState {
+  final NotificationModel notificacion;
+  final List<NotificationModel> todasLasNotificaciones;
+  final int noLeidas;
+
+  const NuevaNotificacionRecibida({
+    required this.notificacion,
+    required this.todasLasNotificaciones,
+    required this.noLeidas,
+  });
+
+  bool get esIngreso =>
+      notificacion.tipo == TipoNotificacion.visitanteIngreso;
+
+  bool get esSolicitudExtension =>
+      notificacion.tipo == TipoNotificacion.solicitudExtension ||
+          notificacion.tipo == TipoNotificacion.qrExpiradoTolerancia;
+
+  @override
+  List<Object?> get props => [notificacion, todasLasNotificaciones, noLeidas];
+}
+
+/// Resultado de [AutorizarExtensionQr].
+class ExtensionQrResultado extends NotificationState {
+  final bool exito;
+  final String mensaje;
+  const ExtensionQrResultado({required this.exito, required this.mensaje});
+  @override
+  List<Object?> get props => [exito, mensaje];
+}
+
+// ── Bloc ──────────────────────────────────────────────────────────────────────
 
 class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   static const String _modulo = 'NOTIFICATION_BLOC';
 
   final NotificationRepository _repository;
+
+  /// Estado local en memoria (igual que v1).
   final List<NotificationModel> _notificaciones = [];
 
-  NotificationBloc({
-    NotificationRepository? repository,
-  })  : _repository = repository ?? NotificationRepository(),
+  /// IDs ya procesados — evita tratar notificaciones existentes como nuevas.
+  final Set<String> _idsVistos = {};
+
+  Timer? _pollingTimer;
+
+  NotificationBloc({NotificationRepository? repository})
+      : _repository = repository ?? NotificationRepository(),
         super(NotificationInitial()) {
+    // ── Handlers que ya existían ──────────────────────────────────────────
     on<CargarNotificaciones>(_onCargarNotificaciones);
     on<NotificacionRecibida>(_onNotificacionRecibida);
     on<MarcarComoLeida>(_onMarcarComoLeida);
     on<LimpiarNotificaciones>(_onLimpiar);
+
+    // ── Handlers nuevos ───────────────────────────────────────────────────
+    on<IniciarPollingNotificaciones>(_onIniciarPolling);
+    on<DetenerPollingNotificaciones>(_onDetenerPolling);
+    on<_TickPolling>(_onTick);
+    on<MarcarNotificacionLeida>(_onMarcarNotificacionLeida);
+    on<MarcarTodasLeidas>(_onMarcarTodasLeidas);
+    on<AutorizarExtensionQr>(_onAutorizarExtension);
   }
+
+  // =========================================================================
+  // Handlers que ya existían — lógica original preservada
+  // =========================================================================
 
   Future<void> _onCargarNotificaciones(
       CargarNotificaciones event,
@@ -117,6 +212,11 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       _notificaciones
         ..clear()
         ..addAll(notificaciones);
+
+      // Registrar todos los IDs para que el polling no los trate como nuevos
+      for (final n in notificaciones) {
+        _idsVistos.add(n.id);
+      }
 
       AppLogger.info(
         _modulo,
@@ -147,6 +247,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     );
 
     _notificaciones.insert(0, event.notificacion);
+    _idsVistos.add(event.notificacion.id);
 
     emit(NotificacionesLoaded(
       notificaciones: List.from(_notificaciones),
@@ -163,9 +264,8 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     );
 
     if (index != -1) {
-      _notificaciones[index] = _notificaciones[index].copyWith(
-        leida: true,
-      );
+      _notificaciones[index] =
+          _notificaciones[index].copyWith(leida: true);
 
       emit(NotificacionesLoaded(
         notificaciones: List.from(_notificaciones),
@@ -179,6 +279,168 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
       Emitter<NotificationState> emit,
       ) {
     _notificaciones.clear();
+    _idsVistos.clear();
+    _pollingTimer?.cancel();
     emit(NotificationInitial());
+  }
+
+  // =========================================================================
+  // Handlers nuevos
+  // =========================================================================
+
+  Future<void> _onIniciarPolling(
+      IniciarPollingNotificaciones event,
+      Emitter<NotificationState> emit,
+      ) async {
+    _pollingTimer?.cancel();
+
+    // Primera carga inmediata sin emitir Loading (no interrumpe la UI)
+    await _fetchYClasificar(emit);
+
+    _pollingTimer = Timer.periodic(event.intervalo, (_) {
+      if (!isClosed) add(_TickPolling());
+    });
+
+    AppLogger.info(
+        _modulo, 'Polling iniciado cada ${event.intervalo.inSeconds}s');
+  }
+
+  Future<void> _onDetenerPolling(
+      DetenerPollingNotificaciones event,
+      Emitter<NotificationState> emit,
+      ) async {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+    AppLogger.info(_modulo, 'Polling detenido');
+  }
+
+  Future<void> _onTick(
+      _TickPolling event,
+      Emitter<NotificationState> emit,
+      ) async {
+    await _fetchYClasificar(emit);
+  }
+
+  Future<void> _onMarcarNotificacionLeida(
+      MarcarNotificacionLeida event,
+      Emitter<NotificationState> emit,
+      ) async {
+    // Actualizar local de inmediato para respuesta rápida en UI
+    final index = _notificaciones.indexWhere(
+          (n) => n.id == event.idNotificacion,
+    );
+    if (index != -1) {
+      _notificaciones[index] =
+          _notificaciones[index].copyWith(leida: true);
+    }
+    _emitirListaActual(emit);
+
+    // Persistir en backend en silencio
+    try {
+      await _repository.marcarLeida(event.idNotificacion);
+    } catch (e) {
+      AppLogger.error(_modulo, 'Error al marcar leída en backend: $e');
+    }
+  }
+
+  Future<void> _onMarcarTodasLeidas(
+      MarcarTodasLeidas event,
+      Emitter<NotificationState> emit,
+      ) async {
+    for (int i = 0; i < _notificaciones.length; i++) {
+      _notificaciones[i] = _notificaciones[i].copyWith(leida: true);
+    }
+    _emitirListaActual(emit);
+
+    try {
+      await _repository.marcarTodasLeidas();
+    } catch (e) {
+      AppLogger.error(_modulo, 'Error al marcar todas en backend: $e');
+    }
+  }
+
+  Future<void> _onAutorizarExtension(
+      AutorizarExtensionQr event,
+      Emitter<NotificationState> emit,
+      ) async {
+    try {
+      await _repository.extenderQr(event.idSolicitud);
+      AppLogger.info(
+          _modulo, 'QR extendido — id_solicitud: ${event.idSolicitud}');
+      emit(const ExtensionQrResultado(
+        exito: true,
+        mensaje: 'Tiempo extendido. El vigilante ya puede registrar el ingreso.',
+      ));
+    } catch (e) {
+      AppLogger.error(_modulo, 'Error al extender QR: $e');
+      emit(const ExtensionQrResultado(
+        exito: false,
+        mensaje: 'No fue posible extender el tiempo. Intenta nuevamente.',
+      ));
+    }
+    _emitirListaActual(emit);
+  }
+
+  // =========================================================================
+  // Helpers privados
+  // =========================================================================
+
+  /// Descarga notificaciones y emite [NuevaNotificacionRecibida] si hay
+  /// alguna accionable nueva, o [NotificacionesLoaded] en caso contrario.
+  /// Nunca emite [NotificationLoading] para no interrumpir la UI.
+  Future<void> _fetchYClasificar(Emitter<NotificationState> emit) async {
+    try {
+      final lista = await _repository.obtenerNotificaciones();
+
+      final nuevasAccionables = lista.where((n) {
+        final esNueva = !_idsVistos.contains(n.id);
+        final esAccionable =
+            n.tipo == TipoNotificacion.visitanteIngreso ||
+                n.tipo == TipoNotificacion.solicitudExtension ||
+                n.tipo == TipoNotificacion.qrExpiradoTolerancia;
+        return esNueva && esAccionable;
+      }).toList();
+
+      for (final n in lista) {
+        _idsVistos.add(n.id);
+      }
+
+      _notificaciones
+        ..clear()
+        ..addAll(lista);
+
+      final noLeidas = lista.where((n) => !n.leida).length;
+
+      if (nuevasAccionables.isNotEmpty) {
+        AppLogger.info(
+            _modulo, 'Accionable detectada: ${nuevasAccionables.first.tipo}');
+        emit(NuevaNotificacionRecibida(
+          notificacion: nuevasAccionables.first,
+          todasLasNotificaciones: List.from(_notificaciones),
+          noLeidas: noLeidas,
+        ));
+      } else {
+        emit(NotificacionesLoaded(
+          notificaciones: List.from(_notificaciones),
+          noLeidas: noLeidas,
+        ));
+      }
+    } catch (e) {
+      AppLogger.error(_modulo, 'Error en polling (silenciado): $e');
+      // Silenciamos para no reemplazar la UI con un estado de error en segundo plano
+    }
+  }
+
+  void _emitirListaActual(Emitter<NotificationState> emit) {
+    emit(NotificacionesLoaded(
+      notificaciones: List.from(_notificaciones),
+      noLeidas: _notificaciones.where((n) => !n.leida).length,
+    ));
+  }
+
+  @override
+  Future<void> close() {
+    _pollingTimer?.cancel();
+    return super.close();
   }
 }

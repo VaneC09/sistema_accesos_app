@@ -1,7 +1,7 @@
 // =============================================================================
 // Proyecto  : Sistema de Gestión de Accesos y Visitas
 // Archivo   : visit_list_item_widget.dart
-// Módulo    : features/access_control/presentation/widgets
+// Módulo    : features/access_control/presentation/extension_dialog.dart
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
 // Versión   : 1.0.0

@@ -4,7 +4,7 @@
 // Módulo    : features/visit_confirmation/data
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
-// Versión   : 1.0.0
+// Versión   : 1.0.1
 // Descripción: Modelo de confirmación de visita — RF-026, RF-051, RF-052
 // =============================================================================
 
@@ -35,10 +35,14 @@ class ConfirmationModel {
 
   factory ConfirmationModel.fromJson(Map<String, dynamic> json) {
     return ConfirmationModel(
+      // Campos obligatorios (Non-nullable en el modelo, con fallback seguro)
       idSolicitud: json['id_solicitud'] as int? ?? 0,
       folio: json['folio'] as String? ?? '',
       nombreVisitante: json['nombre_visitante'] as String? ?? '',
       lugarDestino: json['lugar_destino'] as String? ?? '',
+      estado: json['estado'] as String? ?? '',
+
+      // Campos opcionales (Fechas - Nullable)
       horaLlegadaCampus: json['hora_llegada_campus'] != null
           ? DateTime.parse(json['hora_llegada_campus'] as String)
           : null,
@@ -51,9 +55,25 @@ class ConfirmationModel {
       horaSalidaCampus: json['hora_salida_campus'] != null
           ? DateTime.parse(json['hora_salida_campus'] as String)
           : null,
-      tiempoPermanecinaMinutos:
-      json['tiempo_permanencia_minutos'] as int?,
-      estado: json['estado'] as String? ?? '',
+
+      // Campo opcional (Entero - Nullable)
+      tiempoPermanecinaMinutos: json['tiempo_permanencia_minutos'] as int?,
     );
+  }
+
+  // Opcional: Se agrega método toJson por si necesitas enviar este modelo de vuelta al Backend
+  Map<String, dynamic> toJson() {
+    return {
+      'id_solicitud': idSolicitud,
+      'folio': folio,
+      'nombre_visitante': nombreVisitante,
+      'lugar_destino': lugarDestino,
+      'hora_llegada_campus': horaLlegadaCampus?.toIso8601String(),
+      'hora_llegada_area': horaLlegadaArea?.toIso8601String(),
+      'hora_salida_area': horaSalidaArea?.toIso8601String(),
+      'hora_salida_campus': horaSalidaCampus?.toIso8601String(),
+      'tiempo_permanencia_minutos': tiempoPermanecinaMinutos,
+      'estado': estado,
+    };
   }
 }

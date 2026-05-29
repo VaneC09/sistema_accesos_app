@@ -1,7 +1,7 @@
 // =============================================================================
 // Proyecto  : Sistema de Gestión de Accesos y Visitas
 // Archivo   : solicitud_card_widget.dart
-// Módulo    : features/visit_request/presentation/widgets
+// Módulo    : features/visit_request/presentation/extension_dialog.dart
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
 // Versión   : 1.0.0

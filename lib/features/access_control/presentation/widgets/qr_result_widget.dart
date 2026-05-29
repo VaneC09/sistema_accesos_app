@@ -1,7 +1,7 @@
 // =============================================================================
 // Proyecto  : Sistema de Gestión de Accesos y Visitas
 // Archivo   : qr_result_widget.dart
-// Módulo    : features/access_control/presentation/widgets
+// Módulo    : features/access_control/presentation/extension_dialog.dart
 // Autor     : Omega Company
 // Fecha     : 2026-05-29
 // Versión   : 2.0.0
@@ -64,7 +64,7 @@ class QrResultWidget extends StatelessWidget {
     if (motivo.contains('cancelado'))      return 'Este QR fue cancelado por el solicitante o el sistema.';
     if (motivo.contains('aún no es válido')) {
       final desde = _formatFechaHora(resultado.vigenciaInicio);
-      return 'La visita aún no puede ingresar.\nVálido desde: $desde';
+      return 'La visita no puede ingresar.\nVálido : $desde hrs';
     }
     if (motivo.contains('expirado') || motivo.contains('pasó')) {
       final hasta = _formatFechaHora(resultado.vigenciaFin);

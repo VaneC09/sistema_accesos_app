@@ -4,15 +4,14 @@
 // Módulo    : features/auth/presentation/screens
 // Autor     : Omega Company
 // Fecha     : 2026-05-25
-// Versión   : 1.0.1
-// Descripción: Pantalla principal con menú según rol del usuario.
-//              Fix: evita loading infinito después del login.
+// Versión   : 1.0.0
+// Descripción: Pantalla principal con menú según rol del usuario
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-
 import '../../bloc/auth_bloc.dart';
+import '../../data/auth_repository.dart';
 import '../../presentation/dialogs/logout_dialog.dart';
 import '../../presentation/screens/login_screen.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -39,24 +38,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _verificacionSolicitada = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _verificacionSolicitada) return;
-
-      final state = context.read<AuthBloc>().state;
-
-      if (state is! AuthAuthenticated) {
-        _verificacionSolicitada = true;
-        context.read<AuthBloc>().add(VerificarSesion());
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
@@ -64,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (state is AuthUnauthenticated) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            MaterialPageRoute(builder: (_) => const _LoginRedirect()),
                 (route) => false,
           );
         }
@@ -86,19 +67,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.error_outline_rounded,
-                        color: AppColors.actionRed,
-                        size: 64,
-                      ),
+                      const Icon(Icons.error_outline_rounded, color: AppColors.actionRed, size: 64),
                       const SizedBox(height: AppSpacing.md),
                       Text(
                         'Error de Autenticación:\n${state.mensaje}',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppColors.actionRed,
-                          fontSize: 16,
-                        ),
+                        style: const TextStyle(color: AppColors.actionRed, fontSize: 16),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       ElevatedButton(
@@ -128,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+
   Widget _buildHome(BuildContext context, AuthAuthenticated state) {
     return Scaffold(
       backgroundColor: AppColors.baseSurface,
@@ -142,10 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(
-              Icons.logout_rounded,
-              color: AppColors.baseSurface,
-            ),
+            icon: const Icon(Icons.logout_rounded, color: AppColors.baseSurface),
             onPressed: () => _onLogoutPressed(context),
           ),
         ],
@@ -207,6 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return rol;
     }
   }
+
 
   List<Widget> _getMenuItems(BuildContext context, String rol) {
     switch (rol) {
@@ -298,7 +271,6 @@ class _HomeScreenState extends State<HomeScreen> {
             color: AppColors.headingSky,
             onTap: () async {
               final codigo = await ManualCodeDialog.mostrar(context);
-
               if (codigo != null && context.mounted) {
                 Navigator.push(
                   context,
@@ -352,10 +324,45 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _onLogoutPressed(BuildContext context) async {
     final confirmar = await LogoutDialog.mostrar(context);
-
     if (confirmar == true && context.mounted) {
       context.read<AuthBloc>().add(LogoutRequested());
     }
+  }
+}
+
+// ── Login Redirect ─────────────────────────────────────────────────────────────
+class _LoginRedirect extends StatefulWidget {
+  const _LoginRedirect();
+
+  @override
+  State<_LoginRedirect> createState() => _LoginRedirectState();
+}
+
+class _LoginRedirectState extends State<_LoginRedirect> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BlocProvider(
+            create: (_) => AuthBloc(repository: AuthRepository()),
+            child: const LoginScreen(),
+          ),
+        ),
+            (route) => false,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(color: AppColors.primaryCoral),
+      ),
+    );
   }
 }
 
@@ -373,7 +380,6 @@ class _RegistroManualScreenState extends State<_RegistroManualScreen> {
   @override
   void initState() {
     super.initState();
-
     context.read<AccessControlBloc>().add(
       RegistroManual(
         codigoNumerico: widget.codigo,
@@ -394,10 +400,7 @@ class _RegistroManualScreenState extends State<_RegistroManualScreen> {
           style: TextStyle(color: AppColors.baseSurface),
         ),
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.baseSurface,
-          ),
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.baseSurface),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -406,7 +409,6 @@ class _RegistroManualScreenState extends State<_RegistroManualScreen> {
           if (state is AccessControlLoading) {
             return const LoadingWidget(mensaje: 'Validando código...');
           }
-
           if (state is QrEscaneadoSuccess) {
             return SingleChildScrollView(
               padding: const EdgeInsets.all(AppSpacing.paddingPantalla),
@@ -416,7 +418,6 @@ class _RegistroManualScreenState extends State<_RegistroManualScreen> {
               ),
             );
           }
-
           if (state is AccessControlError) {
             return Center(
               child: Padding(
@@ -448,7 +449,6 @@ class _RegistroManualScreenState extends State<_RegistroManualScreen> {
               ),
             );
           }
-
           return const LoadingWidget(mensaje: 'Procesando...');
         },
       ),
@@ -483,11 +483,7 @@ class _MenuCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icono,
-              size: AppSpacing.iconoLarge,
-              color: color,
-            ),
+            Icon(icono, size: AppSpacing.iconoLarge, color: color),
             const SizedBox(height: AppSpacing.md),
             Text(
               titulo,

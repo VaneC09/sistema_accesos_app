@@ -22,7 +22,7 @@ class AppStrings {
   static const String tituloVigilante = 'Acceso Vigilante';
   static const String subtituloVigilante = 'Registra tu número y área asignada';
   static const String campoTelefono = 'Número de teléfono';
-  static const String hintTelefono = '7221234567';
+  static const String hintTelefono = '';
   static const String campoArea = 'Área asignada';
   static const String botonRegistrarAcceso = 'Registrar acceso';
 

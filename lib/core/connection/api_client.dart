@@ -3,9 +3,9 @@
 // Archivo   : api_client.dart
 // Módulo    : core/connection
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
-// Versión   : 1.0.1
-// Descripción: Cliente HTTP centralizado con Dio — MPF-OMEGA-04 §6.5
+// Fecha     : 2026-05-29
+// Versión   : 1.0.2
+// Descripción: Cliente HTTP centralizado con Dio — Incluye soporte PATCH
 // =============================================================================
 
 import 'package:dio/dio.dart';
@@ -43,7 +43,6 @@ class ApiClient {
     AppLogger.info(_modulo, 'Cliente HTTP inicializado — ${AppConfig.baseUrl}');
   }
 
-
   void _agregarInterceptores() {
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -76,13 +75,11 @@ class ApiClient {
             }
           }
 
-          // ← Solo pasar el DioException original, sin convertir aquí
           return handler.next(error);
         },
       ),
     );
   }
-
 
   Future<Response> get(String endpoint, {Map<String, dynamic>? parametros}) async {
     try {
@@ -120,6 +117,16 @@ class ApiClient {
     }
   }
 
+  // ── NUEVO MÉTODO ADAPTADO ──────────────────────────────────────────────────
+  Future<Response> patch(String endpoint, {Map<String, dynamic>? datos}) async {
+    try {
+      final respuesta = await _dio.patch(endpoint, data: datos);
+      return respuesta;
+    } catch (e) {
+      throw _manejarError(e);
+    }
+  }
+
   AppException _manejarError(dynamic error) {
     if (error is DioException) {
       switch (error.type) {
@@ -136,7 +143,6 @@ class ApiClient {
             mensaje: 'Sin conexión. Verifique su red e intente nuevamente',
           );
         case DioExceptionType.badResponse:
-        // ← Aquí sí tenemos acceso a error.response completo
           return _manejarCodigoHttp(
             error.response?.statusCode,
             error.response,
@@ -156,7 +162,6 @@ class ApiClient {
   }
 
   AppException _manejarCodigoHttp(int? codigo, [Response? response]) {
-    // Extraer mensaje real del backend si existe
     String? mensajeBackend;
     try {
       final body = response?.data;

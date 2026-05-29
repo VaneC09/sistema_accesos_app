@@ -239,24 +239,6 @@ class _ConsultaViewState extends State<_ConsultaView> {
                         ),
                         border: Border.all(color: AppColors.headingSky),
                       ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            color: AppColors.steelBlue,
-                          ),
-                          SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              'Registra una visita espontánea. No requiere autorización de jefe y se generará un pase QR para entrada y salida.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: AppColors.steelBlue,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
 

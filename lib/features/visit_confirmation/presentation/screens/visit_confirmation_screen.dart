@@ -3,9 +3,16 @@
 // Archivo   : visit_confirmation_screen.dart
 // Módulo    : features/visit_confirmation/presentation/screens
 // Autor     : Omega Company
-// Fecha     : 2026-05-23
-// Versión   : 1.0.0
-// Descripción: Pantalla de confirmación de visita — RF-026, RF-051, RF-052
+// Fecha     : 2026-05-29
+// Versión   : 2.0.0
+// Descripción: Pantalla de confirmación de visita con notificaciones en tiempo
+//              real — RF-026, RF-051, RF-052, RF-023
+//
+// Cambios v2:
+//  - Escucha NotificationBloc para refrescarse automáticamente.
+//  - Resalta con borde coral la visita que generó la última notificación.
+//  - Muestra diálogo de decisión cuando llega solicitud de extensión.
+//  - Notificaciones locales al recibir visitante_ingreso y solicitud_extension.
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -18,23 +25,57 @@ import '../../../../core/widgets/primary_button_widget.dart';
 import '../../bloc/visit_confirmation_bloc.dart';
 import '../../data/confirmation_model.dart';
 import '../../data/confirmation_repository.dart';
+import '../../../notifications/bloc/notification_bloc.dart';
+import '../../../notifications/data/notification_model.dart';
+import '../../../notifications/data/notification_service.dart';
+import 'package:sistema_accesos_app/features/visit_confirmation/presentation/screens/widgets/extension_dialog.dart';
+
+// =============================================================================
+// Pantalla raíz — provee ambos Blocs
+// =============================================================================
 
 class VisitConfirmationScreen extends StatelessWidget {
   const VisitConfirmationScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => VisitConfirmationBloc(
-        repository: ConfirmationRepository(),
-      )..add(CargarVisitasActivas()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => VisitConfirmationBloc(
+            repository: ConfirmationRepository(),
+          )..add(CargarVisitasActivas()),
+        ),
+        // NotificationBloc ya debe estar en el árbol superior (ej. MaterialApp).
+        // Si no lo está, provéelo aquí con BlocProvider. Si ya lo tienes arriba,
+        // usa BlocProvider.value o simplemente accede con context.read.
+        // Por seguridad lo creamos aquí también si no está provisto más arriba:
+        BlocProvider(
+          create: (_) => NotificationBloc()
+            ..add(const IniciarPollingNotificaciones(
+              intervalo: Duration(seconds: 15),
+            )),
+        ),
+      ],
       child: const _VisitConfirmationView(),
     );
   }
 }
 
-class _VisitConfirmationView extends StatelessWidget {
+// =============================================================================
+// Vista principal
+// =============================================================================
+
+class _VisitConfirmationView extends StatefulWidget {
   const _VisitConfirmationView();
+
+  @override
+  State<_VisitConfirmationView> createState() => _VisitConfirmationViewState();
+}
+
+class _VisitConfirmationViewState extends State<_VisitConfirmationView> {
+  /// Folio de la visita que generó la última notificación (para resaltado)
+  String? _folioResaltado;
 
   @override
   Widget build(BuildContext context) {
@@ -47,116 +88,328 @@ class _VisitConfirmationView extends StatelessWidget {
           style: TextStyle(color: AppColors.baseSurface),
         ),
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: AppColors.baseSurface,
-          ),
+          icon: const Icon(Icons.arrow_back_rounded,
+              color: AppColors.baseSurface),
           onPressed: () => Navigator.pop(context),
         ),
-      ),
-      body: BlocConsumer<VisitConfirmationBloc, VisitConfirmationState>(
-        listener: (context, state) {
-          if (state is ConfirmationSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.mensaje),
-                backgroundColor: AppColors.successGreen,
-              ),
-            );
-            context
-                .read<VisitConfirmationBloc>()
-                .add(CargarVisitasActivas());
-          } else if (state is VisitConfirmationError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.mensaje),
-                backgroundColor: AppColors.actionRed,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          if (state is VisitConfirmationLoading) {
-            return const LoadingWidget(mensaje: 'Cargando visitas activas...');
-          }
+        // Badge de no leídas
+        actions: [
+          BlocBuilder<NotificationBloc, NotificationState>(
+            builder: (context, state) {
+              int noLeidas = 0;
+              if (state is NotificacionesLoaded) noLeidas = state.noLeidas;
+              if (state is NuevaNotificacionRecibida) noLeidas = state.noLeidas;
 
-          if (state is VisitConfirmationError) {
-            return ErrorMessageWidget(
-              mensaje: state.mensaje,
-              onReintentar: () {
-                context
-                    .read<VisitConfirmationBloc>()
-                    .add(CargarVisitasActivas());
-              },
-            );
-          }
+              if (noLeidas == 0) return const SizedBox.shrink();
 
-          if (state is VisitasActivasLoaded) {
-            if (state.visitas.isEmpty) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              return Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.md),
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    Icon(
-                      Icons.people_outline_rounded,
-                      size: 72,
-                      color: AppColors.headingSky,
-                    ),
-                    SizedBox(height: AppSpacing.md),
-                    Text(
-                      'No hay visitas activas en este momento',
-                      style: TextStyle(
-                        color: AppColors.neutralGrey,
-                        fontSize: 16,
+                    const Icon(Icons.notifications_rounded,
+                        color: AppColors.baseSurface),
+                    Positioned(
+                      top: 6,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: AppColors.actionRed,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$noLeidas',
+                          style: const TextStyle(
+                              fontSize: 9,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                   ],
                 ),
               );
+            },
+          ),
+        ],
+      ),
+
+      // ── Listeners combinados ──────────────────────────────────────────────
+      body: MultiBlocListener(
+        listeners: [
+          // ── VisitConfirmationBloc ─────────────────────────────────────────
+          BlocListener<VisitConfirmationBloc, VisitConfirmationState>(
+            listener: (context, state) {
+              if (state is ConfirmationSuccess) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.mensaje),
+                    backgroundColor: AppColors.successGreen,
+                  ),
+                );
+                context
+                    .read<VisitConfirmationBloc>()
+                    .add(CargarVisitasActivas());
+              } else if (state is VisitConfirmationError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.mensaje),
+                    backgroundColor: AppColors.actionRed,
+                  ),
+                );
+              }
+            },
+          ),
+
+          // ── NotificationBloc ──────────────────────────────────────────────
+          BlocListener<NotificationBloc, NotificationState>(
+            listener: (context, state) async {
+              if (state is! NuevaNotificacionRecibida) return;
+
+              final notif = state.notificacion;
+
+              // 1. Visitante ingresó al campus
+              if (notif.tipo == TipoNotificacion.visitanteIngreso) {
+                // Mostrar notificación local (cabecera)
+                await NotificationService.instancia.notificarIngresoVisitante(
+                  nombreVisitante: notif.nombreVisitante ?? 'Visitante',
+                  area: '',
+                );
+
+                // Resaltar la visita en la lista
+                setState(() {
+                  _folioResaltado = notif.folio;
+                });
+
+                // Refrescar la lista para mostrar al visitante como activo
+                if (context.mounted) {
+                  context
+                      .read<VisitConfirmationBloc>()
+                      .add(CargarVisitasActivas());
+                }
+
+                // Marcar como leída en el backend
+                if (notif.id.isNotEmpty) {
+                  context
+                      .read<NotificationBloc>()
+                      .add(MarcarNotificacionLeida(
+                      idNotificacion: notif.id));
+                }
+              }
+
+              // 2. Solicitud de extensión (visitante llegó tarde)
+              else if (notif.tipo == TipoNotificacion.solicitudExtension ||
+                  notif.tipo == TipoNotificacion.qrExpiradoTolerancia) {
+                // Mostrar notificación local
+                await NotificationService.instancia
+                    .notificarSolicitudExtension(
+                  nombreVisitante: notif.nombreVisitante ?? 'Visitante',
+                  folio: notif.folio ?? '—',
+                );
+
+                // Mostrar diálogo de decisión
+                if (context.mounted) {
+                  await mostrarDialogoExtension(
+                    context: context,
+                    notificacion: notif,
+                    notificationBloc:
+                    context.read<NotificationBloc>(),
+                  );
+                }
+
+                // Marcar como leída
+                if (notif.id.isNotEmpty && context.mounted) {
+                  context
+                      .read<NotificationBloc>()
+                      .add(MarcarNotificacionLeida(
+                      idNotificacion: notif.id));
+                }
+              }
+            },
+          ),
+        ],
+
+        // ── Builder de la lista ───────────────────────────────────────────
+        child: BlocBuilder<VisitConfirmationBloc, VisitConfirmationState>(
+          builder: (context, state) {
+            if (state is VisitConfirmationLoading) {
+              return const LoadingWidget(
+                  mensaje: 'Cargando visitas activas...');
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              itemCount: state.visitas.length,
-              itemBuilder: (context, index) {
-                return _VisitaActivaCard(visita: state.visitas[index]);
-              },
-            );
-          }
+            if (state is VisitConfirmationError) {
+              return ErrorMessageWidget(
+                mensaje: state.mensaje,
+                onReintentar: () {
+                  context
+                      .read<VisitConfirmationBloc>()
+                      .add(CargarVisitasActivas());
+                },
+              );
+            }
 
-          return const SizedBox.shrink();
-        },
+            if (state is VisitasActivasLoaded) {
+              if (state.visitas.isEmpty) {
+                return const _EmptyVisitas();
+              }
+
+              return RefreshIndicator(
+                color: AppColors.primaryCoral,
+                onRefresh: () async {
+                  context
+                      .read<VisitConfirmationBloc>()
+                      .add(CargarVisitasActivas());
+                },
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  itemCount: state.visitas.length,
+                  itemBuilder: (context, index) {
+                    final visita = state.visitas[index];
+                    final esResaltada =
+                        visita.folio == _folioResaltado;
+
+                    return _VisitaActivaCard(
+                      visita: visita,
+                      resaltada: esResaltada,
+                      onAccionCompletada: () {
+                        // Limpiar resaltado cuando el anfitrión actúa
+                        setState(() => _folioResaltado = null);
+                      },
+                    );
+                  },
+                ),
+              );
+            }
+
+            return const SizedBox.shrink();
+          },
+        ),
       ),
     );
   }
 }
 
-class _VisitaActivaCard extends StatelessWidget {
-  final ConfirmationModel visita;
+// =============================================================================
+// Estado vacío
+// =============================================================================
 
-  const _VisitaActivaCard({required this.visita});
+class _EmptyVisitas extends StatelessWidget {
+  const _EmptyVisitas();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.people_outline_rounded,
+            size: 72,
+            color: AppColors.headingSky,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Text(
+            'No hay visitas activas en este momento',
+            style: TextStyle(color: AppColors.neutralGrey, fontSize: 16),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          TextButton.icon(
+            onPressed: () =>
+                context.read<VisitConfirmationBloc>().add(CargarVisitasActivas()),
+            icon: const Icon(Icons.refresh_rounded,
+                color: AppColors.primaryCoral),
+            label: const Text(
+              'Actualizar',
+              style: TextStyle(color: AppColors.primaryCoral),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Card de visita activa con resaltado condicional
+// =============================================================================
+
+class _VisitaActivaCard extends StatelessWidget {
+  final ConfirmationModel visita;
+  final bool resaltada;
+  final VoidCallback? onAccionCompletada;
+
+  const _VisitaActivaCard({
+    required this.visita,
+    this.resaltada = false,
+    this.onAccionCompletada,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // El borde coral indica que esta visita generó la última notificación
+    final colorBorde =
+    resaltada ? AppColors.primaryCoral : AppColors.headingSky;
+    final anchoBorde = resaltada ? 2.0 : 1.0;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: resaltada
+            ? AppColors.primaryCoral.withOpacity(0.05)
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-        border: Border.all(color: AppColors.headingSky),
+        border: Border.all(color: colorBorde, width: anchoBorde),
+        boxShadow: resaltada
+            ? [
+          BoxShadow(
+            color: AppColors.primaryCoral.withOpacity(0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          )
+        ]
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Nombre visitante
-          Text(
-            visita.nombreVisitante,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.deepNavy,
-            ),
+          // Cabecera con nombre y chip de "recién llegó"
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  visita.nombreVisitante,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.deepNavy,
+                  ),
+                ),
+              ),
+              if (resaltada)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryCoral,
+                    borderRadius:
+                    BorderRadius.circular(AppSpacing.radiusPill),
+                  ),
+                  child: const Text(
+                    '● Recién llegó',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
@@ -168,7 +421,7 @@ class _VisitaActivaCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
 
-          // Timeline de eventos
+          // Timeline
           _TimelineItem(
             icono: Icons.login_rounded,
             label: 'Llegada al campus',
@@ -194,9 +447,9 @@ class _VisitaActivaCard extends StatelessWidget {
               onPressed: () {
                 context.read<VisitConfirmationBloc>().add(
                   ConfirmarLlegadaArea(
-                    idSolicitud: visita.idSolicitud,
-                  ),
+                      idSolicitud: visita.idSolicitud),
                 );
+                onAccionCompletada?.call();
               },
             ),
           ] else if (visita.horaSalidaArea == null) ...[
@@ -207,9 +460,9 @@ class _VisitaActivaCard extends StatelessWidget {
                 onPressed: () {
                   context.read<VisitConfirmationBloc>().add(
                     ConfirmarSalidaArea(
-                      idSolicitud: visita.idSolicitud,
-                    ),
+                        idSolicitud: visita.idSolicitud),
                   );
+                  onAccionCompletada?.call();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.headingDark,
@@ -229,6 +482,10 @@ class _VisitaActivaCard extends StatelessWidget {
     );
   }
 }
+
+// =============================================================================
+// Timeline item (sin cambios vs v1)
+// =============================================================================
 
 class _TimelineItem extends StatelessWidget {
   final IconData icono;
@@ -259,7 +516,8 @@ class _TimelineItem extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 13,
-              color: registrado ? AppColors.onyxGrey : AppColors.neutralGrey,
+              color:
+              registrado ? AppColors.onyxGrey : AppColors.neutralGrey,
             ),
           ),
           const Spacer(),
@@ -268,7 +526,9 @@ class _TimelineItem extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: registrado ? AppColors.successGreen : AppColors.neutralGrey,
+              color: registrado
+                  ? AppColors.successGreen
+                  : AppColors.neutralGrey,
             ),
           ),
         ],

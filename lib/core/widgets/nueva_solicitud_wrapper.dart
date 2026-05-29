@@ -1,7 +1,7 @@
 // =============================================================================
 // Proyecto  : Sistema de Gestión de Accesos y Visitas
 // Archivo   : nueva_solicitud_wrapper.dart
-// Módulo    : core/widgets
+// Módulo    : core/extension_dialog.dart
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
 // Versión   : 1.0.0

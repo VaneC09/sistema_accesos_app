@@ -242,30 +242,8 @@ class _InfoSesionBanner extends StatelessWidget {
     required this.minutosInactividad,
     required this.horasJornada,
   });
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.headingDark.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.headingDark.withOpacity(0.15)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline_rounded, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'La sesión se cerrará tras $minutosInactividad min de inactividad '
-                  'o al cumplirse $horasJornada h de jornada.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-        ],
-      ),
-    );
+    return const SizedBox.shrink(); // ◄ No ocupa espacio ni se muestra nada en pantalla
   }
 }

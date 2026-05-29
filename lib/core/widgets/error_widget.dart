@@ -1,7 +1,7 @@
 // =============================================================================
 // Proyecto  : Sistema de Gestión de Accesos y Visitas
 // Archivo   : error_message_widget.dart
-// Módulo    : core/widgets
+// Módulo    : core/extension_dialog.dart
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
 // Versión   : 1.0.0
