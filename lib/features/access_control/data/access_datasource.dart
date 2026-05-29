@@ -48,7 +48,10 @@ class AccessDatasource {
         'area': area
       },
     );
-    return QrScanResultModel.fromJson(respuesta.data as Map<String, dynamic>);
+
+    AppLogger.info(_modulo, 'Respuesta raw escanear: ${respuesta.data}');
+    final body = respuesta.data as Map<String, dynamic>;
+    return QrScanResultModel.fromJson(body['data'] as Map<String, dynamic>);
   }
 
   /// Obtiene la lista de visitas programadas para el día de hoy desenvolviendo el campo 'data'.

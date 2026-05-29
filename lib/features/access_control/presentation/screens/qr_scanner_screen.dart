@@ -53,7 +53,7 @@ class _QrScannerViewState extends State<_QrScannerView> {
   // Teléfono y área del vigilante leídos de SecureStorage al iniciar
   String _telefono = '';
   String _area     = '';
-
+  bool _cargandoDatos = true;
   @override
   void initState() {
     super.initState();
@@ -75,6 +75,7 @@ class _QrScannerViewState extends State<_QrScannerView> {
       setState(() {
         _telefono = tel;
         _area     = area;
+        _cargandoDatos  = false;
       });
     }
   }
@@ -215,7 +216,9 @@ class _QrScannerViewState extends State<_QrScannerView> {
               ),
             );
           }
-
+          if (_cargandoDatos) {
+            return const LoadingWidget(mensaje: 'Cargando datos del vigilante...');
+          }
           // ── Vista principal: cámara + botón manual ────────────────────────
           return Column(
             children: [
