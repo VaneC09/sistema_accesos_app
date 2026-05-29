@@ -16,7 +16,7 @@ class VisitRequestValidator {
 
   // Valida nombre del visitante
   static void validarNombre(String nombre) {
-    if (nombre.trim().length < 5) {
+    if (nombre.trim().length < 2) {
       throw const ValidationException(
         mensaje: AppStrings.errorNombreMinimo,
       );

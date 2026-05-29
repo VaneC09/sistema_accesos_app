@@ -112,7 +112,7 @@ class VisitRequestDatasource {
     final data = respuesta.data as Map<String, dynamic>;
 
     return data['message']?.toString() ??
-        'QR listo para compartir con el visitante.';
+        'QR enviado correctamente al visitante.';
   }
 
   Future<void> reenviarQr(int idSolicitud) async {

@@ -4,8 +4,9 @@
 // Módulo    : features/visit_request/presentation/screens
 // Autor     : Omega Company
 // Fecha     : 2026-05-28
-// Versión   : 2.0.0
+// Versión   : 2.1.0
 // Descripción: Registro de visita espontánea de consulta para vigilante — RF-014
+//              Ahora captura nombre(s), apellidos y envía ambos al backend.
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -43,6 +44,7 @@ class _ConsultaView extends StatefulWidget {
 class _ConsultaViewState extends State<_ConsultaView> {
   final _formKey = GlobalKey<FormState>();
   final _nombreController = TextEditingController();
+  final _apellidosController = TextEditingController();
   final _correoController = TextEditingController();
 
   String _lugarSeleccionado = '';
@@ -55,6 +57,7 @@ class _ConsultaViewState extends State<_ConsultaView> {
   @override
   void dispose() {
     _nombreController.dispose();
+    _apellidosController.dispose();
     _correoController.dispose();
     super.dispose();
   }
@@ -74,6 +77,7 @@ class _ConsultaViewState extends State<_ConsultaView> {
 
     final consulta = ConsultaRequestModel(
       nombreVisitante: _nombreController.text.trim(),
+      apellidosVisitante: _apellidosController.text.trim(),
       correoVisitante: _correoController.text.trim(),
       lugarDestino: _lugarSeleccionado,
     );
@@ -85,6 +89,7 @@ class _ConsultaViewState extends State<_ConsultaView> {
 
   void _limpiarFormulario() {
     _nombreController.clear();
+    _apellidosController.clear();
     _correoController.clear();
     setState(() => _lugarSeleccionado = '');
   }
@@ -131,7 +136,7 @@ class _ConsultaViewState extends State<_ConsultaView> {
                   const SizedBox(height: AppSpacing.md),
                   _InfoResultado(
                     etiqueta: 'Visitante',
-                    valor: resultado.nombreVisitante,
+                    valor: resultado.nombreCompleto,
                   ),
                   _InfoResultado(
                     etiqueta: 'Destino',
@@ -269,8 +274,31 @@ class _ConsultaViewState extends State<_ConsultaView> {
                           return 'El nombre es obligatorio';
                         }
 
-                        if (nombre.length < 5) {
-                          return 'El nombre debe tener al menos 5 caracteres';
+                        if (nombre.length < 2) {
+                          return 'El nombre debe tener al menos 2 caracteres';
+                        }
+
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+
+                    TextFormField(
+                      controller: _apellidosController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Apellidos del visitante',
+                        prefixIcon: Icon(Icons.badge_outlined),
+                      ),
+                      validator: (value) {
+                        final apellidos = value?.trim() ?? '';
+
+                        if (apellidos.isEmpty) {
+                          return 'Los apellidos son obligatorios';
+                        }
+
+                        if (apellidos.length < 2) {
+                          return 'Los apellidos deben tener al menos 2 caracteres';
                         }
 
                         return null;
