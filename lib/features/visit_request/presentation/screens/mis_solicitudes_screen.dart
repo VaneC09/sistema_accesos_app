@@ -13,8 +13,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/widgets/safe_scaffold_body_widget.dart';
+import '../../../../core/widgets/estado_filtro_bar_widget.dart';
 import '../../../../core/widgets/error_widget.dart';
 import '../../../../core/widgets/loading_widget.dart';
+import '../../../../core/widgets/empty_list_state_widget.dart';
+import '../../../../core/widgets/list_stats_header_widget.dart';
+import '../../../../core/widgets/paginated_list_column_widget.dart';
 import '../../bloc/visit_request_bloc.dart';
 import '../../data/visit_request_repository.dart';
 import '../widgets/solicitud_card_widget.dart';
@@ -43,14 +48,18 @@ class _MisSolicitudesView extends StatefulWidget {
 
 class _MisSolicitudesViewState extends State<_MisSolicitudesView> {
   String? _filtroEstado;
+  int _paginaActual = 1;
 
-  final List<String> _estados = [
-    'Todos',
-    'Pendiente',
-    'Autorizada',
-    'Rechazada',
-    'Cancelada',
-  ];
+  void _cargar({int? pagina}) {
+    final paginaDestino = pagina ?? _paginaActual;
+    setState(() => _paginaActual = paginaDestino);
+    context.read<VisitRequestBloc>().add(
+          CargarMisSolicitudes(
+            estado: _filtroEstado,
+            pagina: paginaDestino,
+          ),
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,59 +79,18 @@ class _MisSolicitudesViewState extends State<_MisSolicitudesView> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Column(
-        children: [
-          // Filtros por estado
-          SizedBox(
-            height: 50,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              itemCount: _estados.length,
-              itemBuilder: (context, index) {
-                final estado = _estados[index];
-                final seleccionado = estado == 'Todos'
-                    ? _filtroEstado == null
-                    : _filtroEstado == estado;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _filtroEstado = estado == 'Todos' ? null : estado;
-                    });
-                    context.read<VisitRequestBloc>().add(
-                      CargarMisSolicitudes(estado: _filtroEstado),
-                    );
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(right: AppSpacing.sm),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.xs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: seleccionado
-                          ? AppColors.primaryCoral
-                          : AppColors.surface,
-                      borderRadius:
-                      BorderRadius.circular(AppSpacing.radiusPill),
-                    ),
-                    child: Text(
-                      estado,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: seleccionado
-                            ? AppColors.baseSurface
-                            : AppColors.headingDark,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+      body: SafeScaffoldBody(
+        child: Column(
+          children: [
+          EstadoFiltroBarWidget(
+            filtroSeleccionado: _filtroEstado,
+            onFiltroChanged: (estado) {
+              setState(() {
+                _filtroEstado = estado;
+                _paginaActual = 1;
+              });
+              _cargar(pagina: 1);
+            },
           ),
 
           // Lista de solicitudes
@@ -138,69 +106,78 @@ class _MisSolicitudesViewState extends State<_MisSolicitudesView> {
                 if (state is VisitRequestError) {
                   return ErrorMessageWidget(
                     mensaje: state.mensaje,
-                    onReintentar: () {
-                      context.read<VisitRequestBloc>().add(
-                        CargarMisSolicitudes(estado: _filtroEstado),
-                      );
-                    },
+                    onReintentar: () => _cargar(),
                   );
                 }
 
                 if (state is MisSolicitudesLoaded) {
-                  final solicitudesFiltradas = _filtroEstado == null
-                      ? state.solicitudes
-                      : state.solicitudes
-                      .where(
-                        (solicitud) =>
-                    solicitud.estado.toLowerCase().trim() ==
-                        _filtroEstado!.toLowerCase().trim(),
-                  )
-                      .toList();
-
-                  if (solicitudesFiltradas.isEmpty) {
-                    return Center(
-                      child: Text(
-                        _filtroEstado == null
-                            ? 'No tienes solicitudes registradas'
-                            : 'No tienes solicitudes $_filtroEstado',
-                        style: const TextStyle(
-                          color: AppColors.neutralGrey,
-                          fontSize: 14,
-                        ),
-                      ),
+                  if (state.solicitudes.isEmpty) {
+                    return EmptyListStateWidget(
+                      icono: Icons.inbox_outlined,
+                      titulo: _filtroEstado == null
+                          ? 'No tienes solicitudes registradas'
+                          : 'No tienes solicitudes $_filtroEstado',
+                      subtitulo:
+                          'Las solicitudes que crees aparecerán aquí con su estado.',
+                      accionTexto: 'Actualizar',
+                      onAccion: () => _cargar(pagina: 1),
                     );
                   }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    itemCount: solicitudesFiltradas.length,
-                    itemBuilder: (context, index) {
-                      final solicitud = solicitudesFiltradas[index];
+                  return Column(
+                    children: [
+                      ListStatsHeaderWidget(
+                        titulo: 'Mis solicitudes de visita',
+                        paginacion: state.paginacion,
+                        icono: Icons.description_outlined,
+                      ),
+                      Expanded(
+                        child: PaginatedListColumnWidget(
+                          paginacion: state.paginacion,
+                          onPaginaSeleccionada: (pagina) =>
+                              _cargar(pagina: pagina),
+                          child: RefreshIndicator(
+                            color: AppColors.primaryCoral,
+                            onRefresh: () async => _cargar(),
+                            child: ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              itemCount: state.solicitudes.length,
+                              itemBuilder: (context, index) {
+                                final solicitud = state.solicitudes[index];
 
-                      return SolicitudCardWidget(
-                        solicitud: solicitud,
-                        onTap: () {
-                          if (solicitud.idSolicitud == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('No se pudo abrir el detalle de la solicitud'),
-                                backgroundColor: AppColors.actionRed,
-                              ),
-                            );
-                            return;
-                          }
+                                return SolicitudCardWidget(
+                                  solicitud: solicitud,
+                                  onTap: () {
+                                    if (solicitud.idSolicitud == null) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'No se pudo abrir el detalle de la solicitud',
+                                          ),
+                                          backgroundColor: AppColors.actionRed,
+                                        ),
+                                      );
+                                      return;
+                                    }
 
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => VisitDetailScreen(
-                                idSolicitud: solicitud.idSolicitud!,
-                              ),
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => VisitDetailScreen(
+                                          idSolicitud: solicitud.idSolicitud!,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
                             ),
-                          );
-                        },
-                      );
-                    },
+                          ),
+                        ),
+                      ),
+                    ],
                   );
                 }
 
@@ -209,6 +186,7 @@ class _MisSolicitudesViewState extends State<_MisSolicitudesView> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

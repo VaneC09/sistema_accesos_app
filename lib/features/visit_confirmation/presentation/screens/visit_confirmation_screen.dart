@@ -20,6 +20,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import 'package:sistema_accesos_app/core/widgets/error_widget.dart';
+import '../../../../core/utils/paginacion_local.dart';
+import '../../../../core/widgets/safe_scaffold_body_widget.dart';
+import '../../../../core/widgets/empty_list_state_widget.dart';
+import '../../../../core/widgets/list_stats_header_widget.dart';
+import '../../../../core/widgets/paginated_list_column_widget.dart';
 import '../../../../core/widgets/loading_widget.dart';
 import '../../../../core/widgets/primary_button_widget.dart';
 import '../../bloc/visit_confirmation_bloc.dart';
@@ -39,24 +44,10 @@ class VisitConfirmationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          create: (_) => VisitConfirmationBloc(
-            repository: ConfirmationRepository(),
-          )..add(CargarVisitasActivas()),
-        ),
-        // NotificationBloc ya debe estar en el árbol superior (ej. MaterialApp).
-        // Si no lo está, provéelo aquí con BlocProvider. Si ya lo tienes arriba,
-        // usa BlocProvider.value o simplemente accede con context.read.
-        // Por seguridad lo creamos aquí también si no está provisto más arriba:
-        BlocProvider(
-          create: (_) => NotificationBloc()
-            ..add(const IniciarPollingNotificaciones(
-              intervalo: Duration(seconds: 15),
-            )),
-        ),
-      ],
+    return BlocProvider(
+      create: (_) => VisitConfirmationBloc(
+        repository: ConfirmationRepository(),
+      )..add(CargarVisitasActivas()),
       child: const _VisitConfirmationView(),
     );
   }
@@ -76,6 +67,7 @@ class _VisitConfirmationView extends StatefulWidget {
 class _VisitConfirmationViewState extends State<_VisitConfirmationView> {
   /// Folio de la visita que generó la última notificación (para resaltado)
   String? _folioResaltado;
+  int _paginaActual = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +128,8 @@ class _VisitConfirmationViewState extends State<_VisitConfirmationView> {
       ),
 
       // ── Listeners combinados ──────────────────────────────────────────────
-      body: MultiBlocListener(
+      body: SafeScaffoldBody(
+        child: MultiBlocListener(
         listeners: [
           // ── VisitConfirmationBloc ─────────────────────────────────────────
           BlocListener<VisitConfirmationBloc, VisitConfirmationState>(
@@ -250,81 +243,74 @@ class _VisitConfirmationViewState extends State<_VisitConfirmationView> {
             }
 
             if (state is VisitasActivasLoaded) {
+              final paginado = PaginacionLocal.paginar(
+                state.visitas,
+                pagina: _paginaActual,
+              );
+
               if (state.visitas.isEmpty) {
-                return const _EmptyVisitas();
+                return EmptyListStateWidget(
+                  icono: Icons.people_outline_rounded,
+                  titulo: 'No hay visitas activas en este momento',
+                  subtitulo:
+                      'Cuando un visitante ingrese al campus aparecerá aquí.',
+                  accionTexto: 'Actualizar',
+                  onAccion: () => context
+                      .read<VisitConfirmationBloc>()
+                      .add(CargarVisitasActivas()),
+                );
               }
 
-              return RefreshIndicator(
-                color: AppColors.primaryCoral,
-                onRefresh: () async {
-                  context
-                      .read<VisitConfirmationBloc>()
-                      .add(CargarVisitasActivas());
-                },
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  itemCount: state.visitas.length,
-                  itemBuilder: (context, index) {
-                    final visita = state.visitas[index];
-                    final esResaltada =
-                        visita.folio == _folioResaltado;
-
-                    return _VisitaActivaCard(
-                      visita: visita,
-                      resaltada: esResaltada,
-                      onAccionCompletada: () {
-                        // Limpiar resaltado cuando el anfitrión actúa
-                        setState(() => _folioResaltado = null);
+              return Column(
+                children: [
+                  ListStatsHeaderWidget(
+                    titulo: 'Visitas en curso',
+                    paginacion: paginado.paginacion,
+                    icono: Icons.groups_rounded,
+                  ),
+                  Expanded(
+                    child: PaginatedListColumnWidget(
+                      paginacion: paginado.paginacion,
+                      onPaginaSeleccionada: (pagina) {
+                        setState(() => _paginaActual = pagina);
                       },
-                    );
-                  },
-                ),
+                      child: RefreshIndicator(
+                        color: AppColors.primaryCoral,
+                        onRefresh: () async {
+                          setState(() => _paginaActual = 1);
+                          context
+                              .read<VisitConfirmationBloc>()
+                              .add(CargarVisitasActivas());
+                        },
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          itemCount: paginado.items.length,
+                          itemBuilder: (context, index) {
+                            final visita = paginado.items[index];
+                            final esResaltada =
+                                visita.folio == _folioResaltado;
+
+                            return _VisitaActivaCard(
+                              visita: visita,
+                              resaltada: esResaltada,
+                              onAccionCompletada: () {
+                                setState(() => _folioResaltado = null);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               );
             }
 
             return const SizedBox.shrink();
           },
         ),
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// Estado vacío
-// =============================================================================
-
-class _EmptyVisitas extends StatelessWidget {
-  const _EmptyVisitas();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.people_outline_rounded,
-            size: 72,
-            color: AppColors.headingSky,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const Text(
-            'No hay visitas activas en este momento',
-            style: TextStyle(color: AppColors.neutralGrey, fontSize: 16),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextButton.icon(
-            onPressed: () =>
-                context.read<VisitConfirmationBloc>().add(CargarVisitasActivas()),
-            icon: const Icon(Icons.refresh_rounded,
-                color: AppColors.primaryCoral),
-            label: const Text(
-              'Actualizar',
-              style: TextStyle(color: AppColors.primaryCoral),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -359,14 +345,14 @@ class _VisitaActivaCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: resaltada
-            ? AppColors.primaryCoral.withOpacity(0.05)
+            ? AppColors.primaryCoral.withValues(alpha: 0.05)
             : AppColors.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
         border: Border.all(color: colorBorde, width: anchoBorde),
         boxShadow: resaltada
             ? [
           BoxShadow(
-            color: AppColors.primaryCoral.withOpacity(0.15),
+            color: AppColors.primaryCoral.withValues(alpha: 0.15),
             blurRadius: 8,
             offset: const Offset(0, 2),
           )

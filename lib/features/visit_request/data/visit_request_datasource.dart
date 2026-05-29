@@ -8,8 +8,11 @@
 // Cambio    : Agrega consumo de endpoint para enviar QR al visitante.
 // =============================================================================
 
+import '../../../core/constants/filtro_estado_solicitud.dart';
 import '../../../core/connection/api_client.dart';
+import '../../../core/connection/api_response_helper.dart';
 import '../../../core/errors/app_logger.dart';
+import '../../../core/models/paginated_result.dart';
 import 'visit_request_model.dart';
 
 class VisitRequestDatasource {
@@ -33,14 +36,16 @@ class VisitRequestDatasource {
     return VisitRequestModel.fromJson(solicitudJson);
   }
 
-  Future<List<VisitRequestModel>> obtenerMisSolicitudes({
+  Future<PaginatedResult<VisitRequestModel>> obtenerMisSolicitudes({
     String? estado,
     DateTime? fechaInicio,
     DateTime? fechaFin,
+    int pagina = 1,
   }) async {
-    final parametros = <String, dynamic>{};
+    final parametros = <String, dynamic>{'page': pagina};
 
-    if (estado != null) parametros['estado'] = estado;
+    final estadoApi = FiltroEstadoSolicitud.parametroSolicitudes(estado);
+    if (estadoApi != null) parametros['estado'] = estadoApi;
     if (fechaInicio != null) {
       parametros['fecha_inicio'] = fechaInicio.toIso8601String();
     }
@@ -53,13 +58,14 @@ class VisitRequestDatasource {
       parametros: parametros,
     );
 
-    final data = respuesta.data as Map<String, dynamic>;
-    final paginacion = data['data'] as Map<String, dynamic>;
-    final lista = paginacion['data'] as List<dynamic>? ?? [];
+    final mapas = ApiResponseHelper.extraerMapas(respuesta.data);
+    final items = mapas.map(VisitRequestModel.fromJson).toList();
+    final paginacion = ApiResponseHelper.extraerPaginacion(
+      respuesta.data,
+      cantidadItems: items.length,
+    );
 
-    return lista
-        .map((s) => VisitRequestModel.fromJson(s as Map<String, dynamic>))
-        .toList();
+    return PaginatedResult(items: items, paginacion: paginacion);
   }
 
   Future<VisitRequestModel> obtenerDetalle(int idSolicitud) async {

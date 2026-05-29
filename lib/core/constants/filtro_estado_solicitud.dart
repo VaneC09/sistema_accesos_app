@@ -1,0 +1,52 @@
+// =============================================================================
+// Proyecto  : Sistema de Gestión de Accesos y Visitas
+// Archivo   : filtro_estado_solicitud.dart
+// Módulo    : core/constants
+// Descripción: Chips y mapeo de filtros por estado de solicitud.
+// =============================================================================
+
+class FiltroEstadoSolicitud {
+  FiltroEstadoSolicitud._();
+
+  static const String todos = 'Todos';
+  static const String pendiente = 'Pendiente';
+  static const String autorizada = 'Autorizada';
+  static const String rechazada = 'Rechazada';
+  static const String cancelada = 'Cancelada';
+
+  static const List<String> chips = [
+    todos,
+    pendiente,
+    autorizada,
+    rechazada,
+    cancelada,
+  ];
+
+  /// Valor API para GET /solicitudes?estado=
+  static String? parametroSolicitudes(String? chip) {
+    if (chip == null || chip == todos) return null;
+    return chip.toLowerCase();
+  }
+
+  /// Valor API para GET /autorizador/solicitudes?filtro=
+  static String parametroAutorizador(String? chip) {
+    if (chip == null || chip == todos) return 'todos';
+    switch (chip) {
+      case pendiente:
+        return 'pendientes';
+      case autorizada:
+        return 'autorizadas';
+      case rechazada:
+        return 'rechazadas';
+      case cancelada:
+        return 'canceladas';
+      default:
+        return 'todos';
+    }
+  }
+
+  /// Valor API para GET /notificaciones?estado=
+  static String? parametroNotificaciones(String? chip) {
+    return parametroSolicitudes(chip);
+  }
+}

@@ -23,23 +23,29 @@ class AppConfig {
 
   static const bool esProduccion = true;
 
-  static const String baseUrlDev  = 'http://10.0.2.2:8000/api';
-  static const String baseUrlProd = 'https://decade-trapdoor-wafer.ngrok-free.dev/api';
+  /// URL local (emulador Android → localhost del PC).
+  static const String baseUrlDev = 'http://10.0.2.2:8000/api';
+
+  /// Túnel ngrok hacia `php artisan serve` en gestion-accesos.
+  /// Si cambia al reiniciar ngrok, actualice esta línea y haga hot restart (R).
+  static const String baseUrlProd =
+      'https://decade-trapdoor-wafer.ngrok-free.dev/api';
   static String get baseUrl => esProduccion ? baseUrlProd : baseUrlDev;
 
-  static const int timeoutConexionSegundos  = 10;
+  static const int timeoutConexionSegundos = 10;
   static const int timeoutRespuestaSegundos = 15;
-  static const int maxReintentos            = 2;
+  static const int maxReintentos = 2;
 
   // Sesión general
-  static const int minutosInactividad  = 30;
+  static const int minutosInactividad = 30;
   static const int maxIntentosFallidos = 5;
 
   // Sesión vigilante
   static const int horasJornadaLaboral = 7;
 
   static const int toleranciaDefaultMinutos = 15;
-  static const int maxReenviosQr            = 3;
+  static const int maxReenviosQr = 3;
+  static const int registrosPorPagina = 10;
 
   static const String dominioInstitucional = '@toluca.tecnm.mx';
 
@@ -53,13 +59,13 @@ class AppConfig {
   ];
 
   // Claves de almacenamiento seguro
-  static const String claveToken              = 'access_token';
-  static const String claveRefreshToken       = 'refresh_token';
-  static const String claveUsuario            = 'usuario_data';
-  static const String claveRol                = 'usuario_rol';
-  static const String claveInicioJornada      = 'vigilante_inicio_jornada';
+  static const String claveToken = 'access_token';
+  static const String claveRefreshToken = 'refresh_token';
+  static const String claveUsuario = 'usuario_data';
+  static const String claveRol = 'usuario_rol';
+  static const String claveInicioJornada = 'vigilante_inicio_jornada';
 
   // Claves exclusivas del vigilante (teléfono y área para incluir en peticiones)
-  static const String claveTelefonoVigilante  = 'vigilante_telefono';
-  static const String claveAreaVigilante      = 'vigilante_area';
+  static const String claveTelefonoVigilante = 'vigilante_telefono';
+  static const String claveAreaVigilante = 'vigilante_area';
 }

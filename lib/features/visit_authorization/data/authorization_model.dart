@@ -185,12 +185,11 @@ class AuthorizationModel {
       return 'Autorizada';
     }
 
-    // Si en Laravel no existe "Rechazada" y manejan ese caso como "Cancelada",
-    // Flutter también lo muestra como Cancelada.
-    if (estadoLower == 'rechazada' ||
-        estadoLower == 'rechazado' ||
-        estadoLower == 'cancelada' ||
-        estadoLower == 'cancelado') {
+    if (estadoLower == 'rechazada' || estadoLower == 'rechazado') {
+      return 'Rechazada';
+    }
+
+    if (estadoLower == 'cancelada' || estadoLower == 'cancelado') {
       return 'Cancelada';
     }
 
@@ -204,7 +203,7 @@ class AuthorizationModel {
       case 2:
         return 'Autorizada';
       case 3:
-        return 'Cancelada';
+        return 'Rechazada';
       case 4:
         return 'Cancelada';
       default:

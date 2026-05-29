@@ -68,8 +68,14 @@ class ApiClient {
           );
 
           if (error.response?.statusCode == 401) {
-            final esEndpointLogin = error.requestOptions.path.contains('/login');
-            if (!esEndpointLogin) {
+            final path = error.requestOptions.path;
+            final esEndpointLogin = path.contains('/login');
+            final esRutaVigilante = path.contains('/vigilante/');
+            final rol = await _storage.read(key: AppConfig.claveRol);
+
+            if (!esEndpointLogin &&
+                !esRutaVigilante &&
+                rol != 'vigilante') {
               AppLogger.warning(_modulo, 'Token expirado — cerrando sesión');
               await _limpiarSesion();
             }

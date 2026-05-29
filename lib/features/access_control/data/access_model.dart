@@ -20,6 +20,7 @@ class QrScanResultModel {
   final String accionDisponible;
   final bool accesoConcedido;
   final String? motivoRechazo;
+  final bool llegaTarde;
   final String nombreSolicitante;
   final String departamentoSolicitante;
 
@@ -38,10 +39,25 @@ class QrScanResultModel {
     required this.nombreSolicitante,
     required this.departamentoSolicitante,
     this.motivoRechazo,
+    this.llegaTarde = false,
   });
 
   String get tipoAcceso => accionDisponible;
-  bool get llegaTarde => false;
+
+  /// Indica si el vigilante puede pedir extensión de tiempo al anfitrión.
+  bool get puedeSolicitarExtension {
+    if (accesoConcedido || idQr <= 0) return false;
+    if (llegaTarde) return true;
+
+    final motivo = motivoRechazo?.toLowerCase().trim() ?? '';
+    return motivo.contains('expirado') ||
+        motivo.contains('venció') ||
+        motivo.contains('vencido') ||
+        motivo.contains('pasó') ||
+        motivo.contains('tolerancia') ||
+        motivo.contains('fuera de horario') ||
+        motivo.contains('horario');
+  }
 
   factory QrScanResultModel.fromJson(Map<String, dynamic> json) {
     final visitante   = json['visitante']   as Map<String, dynamic>? ?? {};
@@ -61,9 +77,20 @@ class QrScanResultModel {
       accionDisponible:       json['accion_disponible']     as String? ?? 'entrada',
       accesoConcedido:        json['acceso_concedido']      as bool?   ?? false,
       motivoRechazo:          json['motivo_rechazo']        as String?,
+      llegaTarde:             _parseBool(json['llega_tarde']) ||
+          _parseBool(json['fuera_tolerancia']) ||
+          _parseBool(json['fuera_horario']),
       nombreSolicitante:      solicitante['nombre']         as String? ?? '',
       departamentoSolicitante:solicitante['departamento']   as String? ?? '',
     );
+  }
+
+  static bool _parseBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    final text = value.toString().toLowerCase().trim();
+    return text == '1' || text == 'true' || text == 'si' || text == 'sí';
   }
 }
 

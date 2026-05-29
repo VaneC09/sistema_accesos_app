@@ -15,6 +15,7 @@ import '../data/visit_request_model.dart';
 import '../data/visit_request_repository.dart';
 import '../../../core/errors/app_exceptions.dart';
 import '../../../core/errors/app_logger.dart';
+import '../../../core/models/paginacion_model.dart';
 
 // ── Eventos ──────────────────────────────────────────────────────────────────
 abstract class VisitRequestEvent extends Equatable {
@@ -39,15 +40,17 @@ class CargarMisSolicitudes extends VisitRequestEvent {
   final String? estado;
   final DateTime? fechaInicio;
   final DateTime? fechaFin;
+  final int pagina;
 
   const CargarMisSolicitudes({
     this.estado,
     this.fechaInicio,
     this.fechaFin,
+    this.pagina = 1,
   });
 
   @override
-  List<Object?> get props => [estado, fechaInicio, fechaFin];
+  List<Object?> get props => [estado, fechaInicio, fechaFin, pagina];
 }
 
 class CancelarSolicitud extends VisitRequestEvent {
@@ -115,11 +118,15 @@ class VisitRequestSuccess extends VisitRequestState {
 
 class MisSolicitudesLoaded extends VisitRequestState {
   final List<VisitRequestModel> solicitudes;
+  final PaginacionModel paginacion;
 
-  const MisSolicitudesLoaded({required this.solicitudes});
+  const MisSolicitudesLoaded({
+    required this.solicitudes,
+    required this.paginacion,
+  });
 
   @override
-  List<Object?> get props => [solicitudes];
+  List<Object?> get props => [solicitudes, paginacion];
 }
 
 class VisitRequestActionSuccess extends VisitRequestState {
@@ -229,12 +236,16 @@ class VisitRequestBloc extends Bloc<VisitRequestEvent, VisitRequestState> {
       ) async {
     emit(VisitRequestLoading());
     try {
-      final solicitudes = await _repository.obtenerMisSolicitudes(
+      final resultado = await _repository.obtenerMisSolicitudes(
         estado: event.estado,
         fechaInicio: event.fechaInicio,
         fechaFin: event.fechaFin,
+        pagina: event.pagina,
       );
-      emit(MisSolicitudesLoaded(solicitudes: solicitudes));
+      emit(MisSolicitudesLoaded(
+        solicitudes: resultado.items,
+        paginacion: resultado.paginacion,
+      ));
     } on AppException catch (e) {
       emit(VisitRequestError(mensaje: e.mensaje));
     } catch (e) {

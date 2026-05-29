@@ -4,18 +4,21 @@
 // Módulo    : root
 // Autor     : Omega Company
 // Fecha     : 2026-05-29
-// Versión   : 1.2.0
-// Descripción: El polling de notificaciones solo se activa para roles con
-//              token Sanctum real (solicitante / autorizador).
-//              El vigilante usa 'vigilante-local' y NO tiene acceso a
-//              /notificaciones (requiere auth:sanctum).
+// Versión   : 1.3.0
+// Descripción: Polling de notificaciones según rol:
+//              - solicitante / autorizador → /notificaciones (Sanctum)
+//              - vigilante → /vigilante/notificaciones (teléfono local)
 // =============================================================================
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'core/config/app_config.dart';
 import 'core/connection/api_client.dart';
 import 'core/constants/app_colors.dart';
+import 'core/constants/app_strings.dart';
 import 'core/theme/app_theme.dart';
+import 'features/access_control/presentation/screens/qr_scanner_screen.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/screens/home_screen.dart';
@@ -53,10 +56,6 @@ class SistemaAccesosApp extends StatelessWidget {
   }
 }
 
-// =============================================================================
-// _AppListener — controla el polling según el rol del usuario autenticado
-// =============================================================================
-
 class _AppListener extends StatefulWidget {
   const _AppListener();
 
@@ -66,6 +65,7 @@ class _AppListener extends StatefulWidget {
 
 class _AppListenerState extends State<_AppListener> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  static const _storage = FlutterSecureStorage();
 
   @override
   void initState() {
@@ -74,29 +74,73 @@ class _AppListenerState extends State<_AppListener> {
         _manejarToqueNotificacion;
   }
 
-  /// Solo solicitante y autorizador tienen token Sanctum válido.
-  /// El vigilante guarda 'vigilante-local' — el endpoint /notificaciones
-  /// requiere auth:sanctum y devuelve 401 con ese token.
-  bool _rolUsaNotificaciones(String rol) => rol != 'vigilante';
+  bool _esEmpleado(AuthAuthenticated auth) => auth.rol != 'vigilante';
 
-  void _manejarCambioAuth(BuildContext context, AuthState authState) {
+  Future<void> _manejarCambioAuth(
+    BuildContext context,
+    AuthState authState,
+  ) async {
+    final bloc = context.read<NotificationBloc>();
+
     if (authState is AuthAuthenticated) {
-      if (_rolUsaNotificaciones(authState.rol)) {
-        // Solicitante o autorizador → arrancar polling
-        context.read<NotificationBloc>().add(
+      if (_esEmpleado(authState)) {
+        final token =
+            await _storage.read(key: AppConfig.claveToken) ?? '';
+        if (!context.mounted) return;
+
+        if (token.isEmpty || token == 'vigilante-local') {
+          bloc.add(DetenerPollingNotificaciones());
+          return;
+        }
+
+        bloc.add(
           const IniciarPollingNotificaciones(
             intervalo: Duration(seconds: 15),
           ),
         );
       } else {
-        // Vigilante → asegurarse de que el polling esté detenido
-        context.read<NotificationBloc>().add(DetenerPollingNotificaciones());
+        final telefono =
+            await _storage.read(key: AppConfig.claveTelefonoVigilante) ?? '';
+        if (!context.mounted) return;
+
+        if (telefono.isNotEmpty) {
+          bloc.add(
+            IniciarPollingVigilante(
+              telefono: telefono,
+              intervalo: const Duration(seconds: 15),
+            ),
+          );
+        } else {
+          bloc.add(DetenerPollingNotificaciones());
+        }
       }
     } else if (authState is AuthUnauthenticated) {
-      // Cierre de sesión → detener polling y limpiar estado
-      context.read<NotificationBloc>()
+      bloc
         ..add(DetenerPollingNotificaciones())
         ..add(LimpiarNotificaciones());
+    }
+  }
+
+  void _manejarNotificacionRecibida(
+    BuildContext context,
+    NotificationModel notificacion,
+  ) {
+    final auth = context.read<AuthBloc>().state;
+    if (auth is! AuthAuthenticated) return;
+
+    if (auth.rol == 'vigilante' &&
+        notificacion.tipo == TipoNotificacion.qrExtendido) {
+      NotificationService.instancia.notificarQrExtendido(
+        nombreVisitante: notificacion.nombreVisitante ?? 'Visitante',
+        folio: notificacion.folio ?? '—',
+        idNotificacion: int.tryParse(notificacion.id),
+      );
+
+      if (notificacion.id.isNotEmpty) {
+        context.read<NotificationBloc>().add(
+              MarcarNotificacionLeida(idNotificacion: notificacion.id),
+            );
+      }
     }
   }
 
@@ -104,24 +148,44 @@ class _AppListenerState extends State<_AppListener> {
     final nav = _navigatorKey.currentState;
     if (nav == null) return;
 
+    if (notificacion.tipo == TipoNotificacion.qrExtendido) {
+      nav.push(
+        MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+      );
+      return;
+    }
+
     if (notificacion.tipo == TipoNotificacion.visitanteIngreso ||
         notificacion.tipo == TipoNotificacion.solicitudExtension ||
         notificacion.tipo == TipoNotificacion.qrExpiradoTolerancia) {
-      nav.push(MaterialPageRoute(
-        builder: (_) => BlocProvider.value(
-          value: context.read<NotificationBloc>(),
-          child: const VisitConfirmationScreen(),
+      nav.push(
+        MaterialPageRoute(
+          builder: (_) => BlocProvider.value(
+            value: context.read<NotificationBloc>(),
+            child: const VisitConfirmationScreen(),
+          ),
         ),
-      ));
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<AuthBloc, AuthState>(
-      listener: _manejarCambioAuth,
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<AuthBloc, AuthState>(
+          listener: _manejarCambioAuth,
+        ),
+        BlocListener<NotificationBloc, NotificationState>(
+          listener: (context, state) {
+            if (state is NuevaNotificacionRecibida) {
+              _manejarNotificacionRecibida(context, state.notificacion);
+            }
+          },
+        ),
+      ],
       child: MaterialApp(
-        title: 'Sistema de Accesos ITT',
+        title: AppStrings.tituloApp,
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
         navigatorKey: _navigatorKey,
@@ -130,10 +194,6 @@ class _AppListenerState extends State<_AppListener> {
     );
   }
 }
-
-// =============================================================================
-// SplashScreen — sin cambios respecto a v1.0
-// =============================================================================
 
 class _SplashScreen extends StatefulWidget {
   const _SplashScreen();
@@ -158,16 +218,16 @@ class _SplashScreenState extends State<_SplashScreen> {
   }
 
   void _irAHome() => Navigator.pushAndRemoveUntil(
-    context,
-    MaterialPageRoute(builder: (_) => HomeScreen()),
+        context,
+        MaterialPageRoute(builder: (_) => HomeScreen()),
         (route) => false,
-  );
+      );
 
   void _irALogin() => Navigator.pushAndRemoveUntil(
-    context,
-    MaterialPageRoute(builder: (_) => const LoginScreen()),
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
-  );
+      );
 
   @override
   Widget build(BuildContext context) {

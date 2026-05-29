@@ -11,6 +11,7 @@
 
 import '../../../core/errors/app_exceptions.dart';
 import '../../../core/errors/app_logger.dart';
+import '../../../core/models/paginated_result.dart';
 import 'visit_request_datasource.dart';
 import 'visit_request_model.dart';
 
@@ -38,16 +39,18 @@ class VisitRequestRepository {
   }
 
   // Obtener mis solicitudes
-  Future<List<VisitRequestModel>> obtenerMisSolicitudes({
+  Future<PaginatedResult<VisitRequestModel>> obtenerMisSolicitudes({
     String? estado,
     DateTime? fechaInicio,
     DateTime? fechaFin,
+    int pagina = 1,
   }) async {
     try {
       return await _datasource.obtenerMisSolicitudes(
         estado: estado,
         fechaInicio: fechaInicio,
         fechaFin: fechaFin,
+        pagina: pagina,
       );
     } on AppException {
       rethrow;

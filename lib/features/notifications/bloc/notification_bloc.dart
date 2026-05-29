@@ -27,6 +27,7 @@ import '../data/notification_model.dart';
 import '../data/notification_repository.dart';
 import '../../../core/errors/app_exceptions.dart';
 import '../../../core/errors/app_logger.dart';
+import '../../../core/models/paginacion_model.dart';
 
 // ── Eventos ──────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,15 @@ abstract class NotificationEvent extends Equatable {
 
 // ── Eventos que ya existían (sin cambios) ────────────────────────────────────
 
-class CargarNotificaciones extends NotificationEvent {}
+class CargarNotificaciones extends NotificationEvent {
+  final int pagina;
+  final String? estado;
+
+  const CargarNotificaciones({this.pagina = 1, this.estado});
+
+  @override
+  List<Object?> get props => [pagina, estado];
+}
 
 class NotificacionRecibida extends NotificationEvent {
   final NotificationModel notificacion;
@@ -71,6 +80,20 @@ class IniciarPollingNotificaciones extends NotificationEvent {
 
 /// Detiene el polling (ej. al cerrar sesión).
 class DetenerPollingNotificaciones extends NotificationEvent {}
+
+/// Polling para vigilante vía /vigilante/notificaciones (sin Sanctum).
+class IniciarPollingVigilante extends NotificationEvent {
+  final String telefono;
+  final Duration intervalo;
+
+  const IniciarPollingVigilante({
+    required this.telefono,
+    this.intervalo = const Duration(seconds: 15),
+  });
+
+  @override
+  List<Object?> get props => [telefono, intervalo];
+}
 
 /// Igual que [MarcarComoLeida] pero también persiste en el backend.
 class MarcarNotificacionLeida extends NotificationEvent {
@@ -111,14 +134,16 @@ class NotificationLoading extends NotificationState {}
 class NotificacionesLoaded extends NotificationState {
   final List<NotificationModel> notificaciones;
   final int noLeidas;
+  final PaginacionModel paginacion;
 
   const NotificacionesLoaded({
     required this.notificaciones,
     required this.noLeidas,
+    required this.paginacion,
   });
 
   @override
-  List<Object?> get props => [notificaciones, noLeidas];
+  List<Object?> get props => [notificaciones, noLeidas, paginacion];
 }
 
 class NotificationError extends NotificationState {
@@ -136,22 +161,26 @@ class NuevaNotificacionRecibida extends NotificationState {
   final NotificationModel notificacion;
   final List<NotificationModel> todasLasNotificaciones;
   final int noLeidas;
+  final PaginacionModel paginacion;
 
   const NuevaNotificacionRecibida({
     required this.notificacion,
     required this.todasLasNotificaciones,
     required this.noLeidas,
+    required this.paginacion,
   });
 
-  bool get esIngreso =>
-      notificacion.tipo == TipoNotificacion.visitanteIngreso;
+  bool get esIngreso => notificacion.tipo == TipoNotificacion.visitanteIngreso;
 
   bool get esSolicitudExtension =>
       notificacion.tipo == TipoNotificacion.solicitudExtension ||
-          notificacion.tipo == TipoNotificacion.qrExpiradoTolerancia;
+      notificacion.tipo == TipoNotificacion.qrExpiradoTolerancia;
+
+  bool get esQrExtendido => notificacion.tipo == TipoNotificacion.qrExtendido;
 
   @override
-  List<Object?> get props => [notificacion, todasLasNotificaciones, noLeidas];
+  List<Object?> get props =>
+      [notificacion, todasLasNotificaciones, noLeidas, paginacion];
 }
 
 /// Resultado de [AutorizarExtensionQr].
@@ -177,6 +206,11 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   final Set<String> _idsVistos = {};
 
   Timer? _pollingTimer;
+  bool _modoVigilante = false;
+  String _telefonoVigilante = '';
+  int _paginaActual = 1;
+  String? _filtroEstadoActual;
+  PaginacionModel _paginacionActual = PaginacionModel.vacia;
 
   NotificationBloc({NotificationRepository? repository})
       : _repository = repository ?? NotificationRepository(),
@@ -189,6 +223,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
     // ── Handlers nuevos ───────────────────────────────────────────────────
     on<IniciarPollingNotificaciones>(_onIniciarPolling);
+    on<IniciarPollingVigilante>(_onIniciarPollingVigilante);
     on<DetenerPollingNotificaciones>(_onDetenerPolling);
     on<_TickPolling>(_onTick);
     on<MarcarNotificacionLeida>(_onMarcarNotificacionLeida);
@@ -201,46 +236,69 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   // =========================================================================
 
   Future<void> _onCargarNotificaciones(
-      CargarNotificaciones event,
-      Emitter<NotificationState> emit,
-      ) async {
+    CargarNotificaciones event,
+    Emitter<NotificationState> emit,
+  ) async {
     emit(NotificationLoading());
 
     try {
-      final notificaciones = await _repository.obtenerNotificaciones();
+      _paginaActual = event.pagina;
+      _filtroEstadoActual = event.estado;
+
+      final resultado = _modoVigilante
+          ? await _repository.obtenerNotificacionesVigilante(
+              telefono: _telefonoVigilante,
+              pagina: event.pagina,
+              estado: event.estado,
+            )
+          : await _repository.obtenerNotificaciones(
+              pagina: event.pagina,
+              estado: event.estado,
+            );
+
+      _paginacionActual = resultado.paginacion;
 
       _notificaciones
         ..clear()
-        ..addAll(notificaciones);
+        ..addAll(resultado.items);
 
-      // Registrar todos los IDs para que el polling no los trate como nuevos
-      for (final n in notificaciones) {
+      for (final n in resultado.items) {
         _idsVistos.add(n.id);
       }
 
       AppLogger.info(
         _modulo,
-        'Notificaciones reales cargadas: ${_notificaciones.length}',
+        'Notificaciones cargadas: ${_notificaciones.length}',
       );
 
       emit(NotificacionesLoaded(
         notificaciones: List.from(_notificaciones),
         noLeidas: _notificaciones.where((n) => !n.leida).length,
+        paginacion: _paginacionActual,
+      ));
+    } on NotFoundException catch (_) {
+      _detenerPollingPor404();
+      emit(const NotificationError(
+        mensaje:
+            'El servidor no tiene la ruta /notificaciones (404). '
+            'Levante gestion-accesos, actualice la URL de ngrok en '
+            'app_config.dart y vuelva a iniciar sesión.',
       ));
     } on AppException catch (e) {
       emit(NotificationError(mensaje: e.mensaje));
     } catch (e) {
       AppLogger.error(_modulo, 'Error al cargar notificaciones: $e');
       emit(const NotificationError(
-        mensaje: 'No fue posible obtener las notificaciones. Intente nuevamente',
+        mensaje:
+            'No fue posible obtener las notificaciones. Intente nuevamente',
       ));
     }
   }
 
   void _onNotificacionRecibida(
-      NotificacionRecibida event,
-      Emitter<NotificationState> emit,
-      ) {
+    NotificacionRecibida event,
+    Emitter<NotificationState> emit,
+  ) {
     AppLogger.info(
       _modulo,
       'Nueva notificación recibida localmente: ${event.notificacion.tipo}',
@@ -252,35 +310,41 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     emit(NotificacionesLoaded(
       notificaciones: List.from(_notificaciones),
       noLeidas: _notificaciones.where((n) => !n.leida).length,
+      paginacion: _paginacionActual,
     ));
   }
 
   void _onMarcarComoLeida(
-      MarcarComoLeida event,
-      Emitter<NotificationState> emit,
-      ) {
+    MarcarComoLeida event,
+    Emitter<NotificationState> emit,
+  ) {
     final index = _notificaciones.indexWhere(
-          (n) => n.id == event.idNotificacion,
+      (n) => n.id == event.idNotificacion,
     );
 
     if (index != -1) {
-      _notificaciones[index] =
-          _notificaciones[index].copyWith(leida: true);
+      _notificaciones[index] = _notificaciones[index].copyWith(leida: true);
 
       emit(NotificacionesLoaded(
         notificaciones: List.from(_notificaciones),
         noLeidas: _notificaciones.where((n) => !n.leida).length,
+        paginacion: _paginacionActual,
       ));
     }
   }
 
   void _onLimpiar(
-      LimpiarNotificaciones event,
-      Emitter<NotificationState> emit,
-      ) {
+    LimpiarNotificaciones event,
+    Emitter<NotificationState> emit,
+  ) {
     _notificaciones.clear();
     _idsVistos.clear();
     _pollingTimer?.cancel();
+    _modoVigilante = false;
+    _telefonoVigilante = '';
+    _paginaActual = 1;
+    _filtroEstadoActual = null;
+    _paginacionActual = PaginacionModel.vacia;
     emit(NotificationInitial());
   }
 
@@ -289,12 +353,36 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   // =========================================================================
 
   Future<void> _onIniciarPolling(
-      IniciarPollingNotificaciones event,
-      Emitter<NotificationState> emit,
-      ) async {
+    IniciarPollingNotificaciones event,
+    Emitter<NotificationState> emit,
+  ) async {
     _pollingTimer?.cancel();
+    _modoVigilante = false;
+    _telefonoVigilante = '';
 
-    // Primera carga inmediata sin emitir Loading (no interrumpe la UI)
+    await _fetchYClasificar(emit);
+
+    _pollingTimer = Timer.periodic(event.intervalo, (_) {
+      if (!isClosed) add(_TickPolling());
+    });
+
+    AppLogger.info(_modulo,
+        'Polling empleado iniciado cada ${event.intervalo.inSeconds}s');
+  }
+
+  Future<void> _onIniciarPollingVigilante(
+    IniciarPollingVigilante event,
+    Emitter<NotificationState> emit,
+  ) async {
+    if (event.telefono.isEmpty) {
+      AppLogger.warning(_modulo, 'Polling vigilante omitido — teléfono vacío');
+      return;
+    }
+
+    _pollingTimer?.cancel();
+    _modoVigilante = true;
+    _telefonoVigilante = event.telefono;
+
     await _fetchYClasificar(emit);
 
     _pollingTimer = Timer.periodic(event.intervalo, (_) {
@@ -302,51 +390,61 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     });
 
     AppLogger.info(
-        _modulo, 'Polling iniciado cada ${event.intervalo.inSeconds}s');
+      _modulo,
+      'Polling vigilante iniciado cada ${event.intervalo.inSeconds}s',
+    );
   }
 
   Future<void> _onDetenerPolling(
-      DetenerPollingNotificaciones event,
-      Emitter<NotificationState> emit,
-      ) async {
+    DetenerPollingNotificaciones event,
+    Emitter<NotificationState> emit,
+  ) async {
     _pollingTimer?.cancel();
     _pollingTimer = null;
+    _modoVigilante = false;
+    _telefonoVigilante = '';
     AppLogger.info(_modulo, 'Polling detenido');
   }
 
   Future<void> _onTick(
-      _TickPolling event,
-      Emitter<NotificationState> emit,
-      ) async {
+    _TickPolling event,
+    Emitter<NotificationState> emit,
+  ) async {
     await _fetchYClasificar(emit);
   }
 
   Future<void> _onMarcarNotificacionLeida(
-      MarcarNotificacionLeida event,
-      Emitter<NotificationState> emit,
-      ) async {
+    MarcarNotificacionLeida event,
+    Emitter<NotificationState> emit,
+  ) async {
     // Actualizar local de inmediato para respuesta rápida en UI
     final index = _notificaciones.indexWhere(
-          (n) => n.id == event.idNotificacion,
+      (n) => n.id == event.idNotificacion,
     );
     if (index != -1) {
-      _notificaciones[index] =
-          _notificaciones[index].copyWith(leida: true);
+      _notificaciones[index] = _notificaciones[index].copyWith(leida: true);
     }
     _emitirListaActual(emit);
 
     // Persistir en backend en silencio
     try {
-      await _repository.marcarLeida(event.idNotificacion);
+      if (_modoVigilante) {
+        await _repository.marcarLeidaVigilante(
+          idNotificacion: event.idNotificacion,
+          telefono: _telefonoVigilante,
+        );
+      } else {
+        await _repository.marcarLeida(event.idNotificacion);
+      }
     } catch (e) {
       AppLogger.error(_modulo, 'Error al marcar leída en backend: $e');
     }
   }
 
   Future<void> _onMarcarTodasLeidas(
-      MarcarTodasLeidas event,
-      Emitter<NotificationState> emit,
-      ) async {
+    MarcarTodasLeidas event,
+    Emitter<NotificationState> emit,
+  ) async {
     for (int i = 0; i < _notificaciones.length; i++) {
       _notificaciones[i] = _notificaciones[i].copyWith(leida: true);
     }
@@ -360,16 +458,17 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   }
 
   Future<void> _onAutorizarExtension(
-      AutorizarExtensionQr event,
-      Emitter<NotificationState> emit,
-      ) async {
+    AutorizarExtensionQr event,
+    Emitter<NotificationState> emit,
+  ) async {
     try {
       await _repository.extenderQr(event.idSolicitud);
       AppLogger.info(
           _modulo, 'QR extendido — id_solicitud: ${event.idSolicitud}');
       emit(const ExtensionQrResultado(
         exito: true,
-        mensaje: 'Tiempo extendido. El vigilante ya puede registrar el ingreso.',
+        mensaje:
+            'Tiempo extendido. El vigilante ya puede registrar el ingreso.',
       ));
     } catch (e) {
       AppLogger.error(_modulo, 'Error al extender QR: $e');
@@ -390,26 +489,33 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
   /// Nunca emite [NotificationLoading] para no interrumpir la UI.
   Future<void> _fetchYClasificar(Emitter<NotificationState> emit) async {
     try {
-      final lista = await _repository.obtenerNotificaciones();
+      final resultado = _modoVigilante
+          ? await _repository.obtenerNotificacionesVigilante(
+              telefono: _telefonoVigilante,
+              pagina: _paginaActual,
+              estado: _filtroEstadoActual,
+            )
+          : await _repository.obtenerNotificaciones(
+              pagina: _paginaActual,
+              estado: _filtroEstadoActual,
+            );
 
-      final nuevasAccionables = lista.where((n) {
+      _paginacionActual = resultado.paginacion;
+
+      final nuevasAccionables = resultado.items.where((n) {
         final esNueva = !_idsVistos.contains(n.id);
-        final esAccionable =
-            n.tipo == TipoNotificacion.visitanteIngreso ||
-                n.tipo == TipoNotificacion.solicitudExtension ||
-                n.tipo == TipoNotificacion.qrExpiradoTolerancia;
-        return esNueva && esAccionable;
+        return esNueva && _esAccionable(n.tipo);
       }).toList();
 
-      for (final n in lista) {
+      for (final n in resultado.items) {
         _idsVistos.add(n.id);
       }
 
       _notificaciones
         ..clear()
-        ..addAll(lista);
+        ..addAll(resultado.items);
 
-      final noLeidas = lista.where((n) => !n.leida).length;
+      final noLeidas = resultado.items.where((n) => !n.leida).length;
 
       if (nuevasAccionables.isNotEmpty) {
         AppLogger.info(
@@ -418,23 +524,52 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
           notificacion: nuevasAccionables.first,
           todasLasNotificaciones: List.from(_notificaciones),
           noLeidas: noLeidas,
+          paginacion: _paginacionActual,
         ));
       } else {
         emit(NotificacionesLoaded(
           notificaciones: List.from(_notificaciones),
           noLeidas: noLeidas,
+          paginacion: _paginacionActual,
         ));
       }
+    } on NotFoundException catch (_) {
+      _detenerPollingPor404();
     } catch (e) {
       AppLogger.error(_modulo, 'Error en polling (silenciado): $e');
       // Silenciamos para no reemplazar la UI con un estado de error en segundo plano
     }
   }
 
+  void _detenerPollingPor404() {
+    if (_pollingTimer == null) return;
+
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+
+    AppLogger.error(
+      _modulo,
+      'Polling detenido — GET /notificaciones devolvió 404. '
+      'Confirme que gestion-accesos está corriendo con routes/api.php actualizado '
+      'y que baseUrlProd en app_config.dart apunta al túnel ngrok vigente.',
+    );
+  }
+
+  bool _esAccionable(TipoNotificacion tipo) {
+    if (_modoVigilante) {
+      return tipo == TipoNotificacion.qrExtendido;
+    }
+
+    return tipo == TipoNotificacion.visitanteIngreso ||
+        tipo == TipoNotificacion.solicitudExtension ||
+        tipo == TipoNotificacion.qrExpiradoTolerancia;
+  }
+
   void _emitirListaActual(Emitter<NotificationState> emit) {
     emit(NotificacionesLoaded(
       notificaciones: List.from(_notificaciones),
       noLeidas: _notificaciones.where((n) => !n.leida).length,
+      paginacion: _paginacionActual,
     ));
   }
 

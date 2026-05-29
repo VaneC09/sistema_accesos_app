@@ -5,7 +5,7 @@
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
 // Versión   : 1.0.0
-// Descripción: Cadenas de texto centralizadas — MPF-OMEGA-04 §6.4
+// Descripción: Cadenas de texto centralizadas — MPF-OMEGA-04 6.4.0
 // =============================================================================
 
 class AppStrings {
@@ -13,7 +13,8 @@ class AppStrings {
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   static const String tituloApp = 'Sistema de Accesos ITT';
-  static const String subtituloLogin = 'Ingresa tus credenciales institucionales';
+  static const String subtituloLogin =
+      'Ingresa tus credenciales institucionales';
   static const String campoUsuario = 'Usuario institucional';
   static const String hintUsuario = 'usuario@toluca.tecnm.mx';
   static const String campoContrasena = 'Contraseña';
@@ -83,8 +84,7 @@ class AppStrings {
   static const String errorCorreoDuplicado =
       'No se permiten correos duplicados en el grupo';
   static const String errorTipoVisita = 'Seleccione el tipo de visitante';
-  static const String errorDepartamento =
-      'Seleccione el departamento destino';
+  static const String errorDepartamento = 'Seleccione el departamento destino';
   static const String errorSolicitudFallida =
       'No fue posible crear la solicitud. Intente nuevamente';
   static const String errorCatalogoNoDisponible =
@@ -120,6 +120,15 @@ class AppStrings {
       'No fue posible enviar el pase. Intente más tarde.';
   static const String exitoExtensionQr =
       'La vigencia del pase QR ha sido extendida.';
+  static const String botonSolicitarExtension =
+      'Notificar al anfitrión para extender tiempo';
+  static const String exitoSolicitudExtension =
+      'Notificación enviada al anfitrión.';
+  static const String errorSolicitudExtension =
+      'No se pudo enviar la notificación. Intenta de nuevo.';
+  static const String notifQrExtendidoTitulo = 'Tiempo de acceso extendido';
+  static const String notifQrExtendidoMensaje =
+      'Ya puedes registrar el ingreso del visitante.';
   static const String errorExtensionQr =
       'No fue posible extender la vigencia del QR.';
   static const String limiteReenvios =
@@ -130,7 +139,8 @@ class AppStrings {
   static const String tituloVisitasHoy = 'Visitas de hoy';
   static const String accesoPermitido = 'Acceso permitido';
   static const String accesoDenegado = 'Acceso denegado';
-  static const String accesoFueraHorario = 'Acceso fuera del horario permitido.';
+  static const String accesoFueraHorario =
+      'Acceso fuera del horario permitido.';
   static const String qrVencidoHora = 'Código vencido por hora';
   static const String qrVencidoFecha = 'Código vencido por fecha';
   static const String qrVencidoTolerancia = 'Código vencido por tolerancia';
@@ -140,14 +150,12 @@ class AppStrings {
       'No fue posible validar exclusión. Acceso denegado por precaución';
   static const String exitoEntrada = 'Entrada registrada correctamente';
   static const String exitoSalida = 'Salida registrada correctamente';
-  static const String errorRegistroSalida =
-      'No fue posible registrar salida';
+  static const String errorRegistroSalida = 'No fue posible registrar salida';
 
   // ── Notificaciones ────────────────────────────────────────────────────────
   static const String notifSolicitudAutorizada =
       'Su solicitud ha sido autorizada.';
-  static const String notifSolicitudRechazada =
-      'Su solicitud fue rechazada.';
+  static const String notifSolicitudRechazada = 'Su solicitud fue rechazada.';
   static const String notifVisitanteIngreso =
       'El visitante ha ingresado al campus';
   static const String notifPermanenciaExcedida =

@@ -60,7 +60,7 @@ class PhoneResolver {
       }
 
       for (final sim in sims) {
-        final numero = _normalizarTelefono(sim.number ?? '');
+        final numero = _normalizarTelefono(sim.number);
         if (numero.length == 10) {
           return PhoneResolveResult(
             status: PhoneResolveStatus.success,

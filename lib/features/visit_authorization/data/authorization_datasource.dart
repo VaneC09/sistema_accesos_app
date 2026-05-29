@@ -9,7 +9,10 @@
 // =============================================================================
 
 import '../../../core/connection/api_client.dart';
+import '../../../core/connection/api_response_helper.dart';
+import '../../../core/constants/filtro_estado_solicitud.dart';
 import '../../../core/errors/app_logger.dart';
+import '../../../core/models/paginated_result.dart';
 import 'authorization_model.dart';
 
 class AuthorizationDatasource {
@@ -19,18 +22,30 @@ class AuthorizationDatasource {
   AuthorizationDatasource({ApiClient? apiClient})
       : _apiClient = apiClient ?? ApiClient.instancia;
 
-  Future<List<AuthorizationModel>> obtenerPendientes() async {
-    AppLogger.info(_modulo, 'Obteniendo solicitudes pendientes');
+  Future<PaginatedResult<AuthorizationModel>> obtenerPendientes({
+    String? estado,
+    int pagina = 1,
+  }) async {
+    AppLogger.info(_modulo, 'Obteniendo solicitudes del autorizador');
 
-    final respuesta = await _apiClient.get('/autorizador/solicitudes');
+    final parametros = <String, dynamic>{
+      'page': pagina,
+      'filtro': FiltroEstadoSolicitud.parametroAutorizador(estado),
+    };
 
-    final data = respuesta.data as Map<String, dynamic>;
-    final paginacion = data['data'] as Map<String, dynamic>;
-    final lista = paginacion['data'] as List<dynamic>? ?? [];
+    final respuesta = await _apiClient.get(
+      '/autorizador/solicitudes',
+      parametros: parametros,
+    );
 
-    return lista
-        .map((s) => AuthorizationModel.fromJson(s as Map<String, dynamic>))
-        .toList();
+    final mapas = ApiResponseHelper.extraerMapas(respuesta.data);
+    final items = mapas.map(AuthorizationModel.fromJson).toList();
+    final paginacion = ApiResponseHelper.extraerPaginacion(
+      respuesta.data,
+      cantidadItems: items.length,
+    );
+
+    return PaginatedResult(items: items, paginacion: paginacion);
   }
 
   Future<AuthorizationModel> obtenerDetalle(int idSolicitud) async {

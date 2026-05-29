@@ -9,6 +9,7 @@
 // =============================================================================
 
 import '../../../core/connection/api_client.dart';
+import '../../../core/connection/api_response_helper.dart';
 import '../../../core/errors/app_logger.dart';
 import 'notification_model.dart';
 
@@ -24,12 +25,9 @@ class NotificationDatasource {
 
     final respuesta = await _apiClient.get('/notificaciones');
 
-    final data = respuesta.data as Map<String, dynamic>;
-    final paginacion = data['data'] as Map<String, dynamic>;
-    final lista = paginacion['data'] as List<dynamic>? ?? [];
-
-    return lista
-        .map((n) => NotificationModel.fromJson(n as Map<String, dynamic>))
-        .toList();
+    return ApiResponseHelper.extraerMapas(
+      respuesta.data,
+      etiqueta: 'GET /notificaciones (datasource)',
+    ).map(NotificationModel.fromJson).toList();
   }
 }

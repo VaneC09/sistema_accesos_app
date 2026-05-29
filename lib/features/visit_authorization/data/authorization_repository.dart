@@ -10,6 +10,7 @@
 
 import '../../../core/errors/app_exceptions.dart';
 import '../../../core/errors/app_logger.dart';
+import '../../../core/models/paginated_result.dart';
 import 'authorization_datasource.dart';
 import 'authorization_model.dart';
 
@@ -20,9 +21,15 @@ class AuthorizationRepository {
   AuthorizationRepository({AuthorizationDatasource? datasource})
       : _datasource = datasource ?? AuthorizationDatasource();
 
-  Future<List<AuthorizationModel>> obtenerPendientes() async {
+  Future<PaginatedResult<AuthorizationModel>> obtenerPendientes({
+    String? estado,
+    int pagina = 1,
+  }) async {
     try {
-      return await _datasource.obtenerPendientes();
+      return await _datasource.obtenerPendientes(
+        estado: estado,
+        pagina: pagina,
+      );
     } on AppException {
       rethrow;
     } catch (e) {

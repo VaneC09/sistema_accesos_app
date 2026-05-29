@@ -25,39 +25,55 @@ class VisitListItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: AppColors.baseSurface,
-          borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
-          border: Border.all(color: AppColors.surface),
-        ),
-        child: Row(
-          children: [
-            // Indicadores de entrada/salida
-            Column(
-              children: [
-                Icon(
-                  Icons.login_rounded,
-                  size: 20,
-                  color: visita.entradaRegistrada
-                      ? AppColors.successGreen
-                      : AppColors.surface,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Icon(
-                  Icons.logout_rounded,
-                  size: 20,
-                  color: visita.salidaRegistrada
-                      ? AppColors.successGreen
-                      : AppColors.surface,
-                ),
-              ],
+    return Material(
+      color: AppColors.baseSurface,
+      elevation: 1,
+      shadowColor: AppColors.deepNavy.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.md),
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+            border: Border.all(
+              color: AppColors.headingSky.withValues(alpha: 0.35),
             ),
-            const SizedBox(width: AppSpacing.md),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.cloudBlue.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.login_rounded,
+                      size: 20,
+                      color: visita.entradaRegistrada
+                          ? AppColors.successGreen
+                          : AppColors.neutralGrey,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Icon(
+                      Icons.logout_rounded,
+                      size: 20,
+                      color: visita.salidaRegistrada
+                          ? AppColors.successGreen
+                          : AppColors.neutralGrey,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
 
             // Información
             Expanded(
@@ -99,7 +115,7 @@ class VisitListItemWidget extends StatelessWidget {
                 vertical: AppSpacing.xs,
               ),
               decoration: BoxDecoration(
-                color: _colorEstado(visita.estado).withOpacity(0.15),
+                color: _colorEstado(visita.estado).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
               ),
               child: Text(
@@ -113,6 +129,7 @@ class VisitListItemWidget extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

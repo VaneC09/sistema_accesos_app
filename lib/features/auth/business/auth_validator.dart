@@ -11,9 +11,6 @@
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/errors/app_exceptions.dart';
-import '../../../core/config/app_config.dart';
-import '../../../core/constants/app_strings.dart';
-import '../../../core/errors/app_exceptions.dart';
 
 class AuthValidator {
   AuthValidator._();

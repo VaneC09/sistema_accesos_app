@@ -3,9 +3,9 @@
 // Archivo   : visitas_hoy_screen.dart
 // Módulo    : features/access_control/presentation/screens
 // Autor     : Omega Company
-// Fecha     : 2026-05-27
-// Versión   : 1.0.1
-// Descripción: Pantalla de visitas del día para vigilante — RF-025 (Fix Storage)
+// Fecha     : 2026-05-29
+// Versión   : 1.2.0
+// Descripción: Pantalla de visitas del día para vigilante — RF-025
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -15,8 +15,13 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/utils/paginacion_local.dart';
+import '../../../../core/widgets/safe_scaffold_body_widget.dart';
+import '../../../../core/widgets/empty_list_state_widget.dart';
 import '../../../../core/widgets/error_widget.dart';
+import '../../../../core/widgets/list_stats_header_widget.dart';
 import '../../../../core/widgets/loading_widget.dart';
+import '../../../../core/widgets/paginated_list_column_widget.dart';
 import '../../bloc/access_control_bloc.dart';
 import '../../data/access_repository.dart';
 import '../widgets/visit_list_item_widget.dart';
@@ -29,7 +34,7 @@ class VisitasHoyScreen extends StatelessWidget {
     return BlocProvider(
       create: (_) => AccessControlBloc(
         repository: AccessRepository(),
-      )..add(const CargarVisitasHoy(telefono: '')), // Se sobreescribe con el teléfono real en el initState del View
+      )..add(const CargarVisitasHoy(telefono: '')),
       child: const _VisitasHoyView(),
     );
   }
@@ -45,6 +50,7 @@ class _VisitasHoyView extends StatefulWidget {
 class _VisitasHoyViewState extends State<_VisitasHoyView> {
   final _storage = const FlutterSecureStorage();
   String _telefono = '';
+  int _paginaActual = 1;
 
   @override
   void initState() {
@@ -52,19 +58,17 @@ class _VisitasHoyViewState extends State<_VisitasHoyView> {
     _cargarTelefonoYVisitas();
   }
 
-  /// Recupera el teléfono almacenado localmente e inicia la carga de datos en el BLOC
   Future<void> _cargarTelefonoYVisitas() async {
-    final tel = await _storage.read(key: AppConfig.claveTelefonoVigilante) ?? '';
+    final tel =
+        await _storage.read(key: AppConfig.claveTelefonoVigilante) ?? '';
     if (mounted) {
-      setState(() {
-        _telefono = tel;
-      });
+      setState(() => _telefono = tel);
       context.read<AccessControlBloc>().add(CargarVisitasHoy(telefono: tel));
     }
   }
 
-  /// Invoca la recarga de información utilizando el teléfono en memoria
-  void _recargar() {
+  void _recargar({int? pagina}) {
+    if (pagina != null) setState(() => _paginaActual = pagina);
     context.read<AccessControlBloc>().add(CargarVisitasHoy(telefono: _telefono));
   }
 
@@ -74,6 +78,7 @@ class _VisitasHoyViewState extends State<_VisitasHoyView> {
       backgroundColor: AppColors.baseSurface,
       appBar: AppBar(
         backgroundColor: AppColors.primaryCoral,
+        elevation: 0,
         title: const Text(
           AppStrings.tituloVisitasHoy,
           style: TextStyle(color: AppColors.baseSurface),
@@ -87,15 +92,20 @@ class _VisitasHoyViewState extends State<_VisitasHoyView> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Actualizar',
             icon: const Icon(
               Icons.refresh_rounded,
               color: AppColors.baseSurface,
             ),
-            onPressed: _recargar,
+            onPressed: () {
+              setState(() => _paginaActual = 1);
+              _recargar();
+            },
           ),
         ],
       ),
-      body: BlocBuilder<AccessControlBloc, AccessControlState>(
+      body: SafeScaffoldBody(
+        child: BlocBuilder<AccessControlBloc, AccessControlState>(
         builder: (context, state) {
           if (state is AccessControlLoading) {
             return const LoadingWidget(
@@ -111,43 +121,60 @@ class _VisitasHoyViewState extends State<_VisitasHoyView> {
           }
 
           if (state is VisitasHoyLoaded) {
+            final paginado = PaginacionLocal.paginar(
+              state.visitas,
+              pagina: _paginaActual,
+            );
+
             if (state.visitas.isEmpty) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.event_available_rounded,
-                      size: 72,
-                      color: AppColors.headingSky,
-                    ),
-                    SizedBox(height: AppSpacing.md),
-                    Text(
-                      'No hay visitas programadas para hoy',
-                      style: TextStyle(
-                        color: AppColors.neutralGrey,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
+              return EmptyListStateWidget(
+                icono: Icons.event_available_rounded,
+                titulo: 'No hay visitas programadas para hoy',
+                subtitulo:
+                    'Cuando se autoricen accesos aparecerán aquí con su horario.',
+                accionTexto: 'Actualizar',
+                onAccion: _recargar,
               );
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              itemCount: state.visitas.length,
-              itemBuilder: (context, index) {
-                return VisitListItemWidget(
-                  visita: state.visitas[index],
-                  onTap: () {},
-                );
-              },
+            return Column(
+              children: [
+                ListStatsHeaderWidget(
+                  titulo: 'Visitas programadas hoy',
+                  paginacion: paginado.paginacion,
+                  icono: Icons.calendar_today_rounded,
+                  colorAcento: AppColors.headingDark,
+                ),
+                Expanded(
+                  child: PaginatedListColumnWidget(
+                    paginacion: paginado.paginacion,
+                    onPaginaSeleccionada: (pagina) {
+                      setState(() => _paginaActual = pagina);
+                    },
+                    child: RefreshIndicator(
+                      color: AppColors.primaryCoral,
+                      onRefresh: () async => _recargar(),
+                      child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        itemCount: paginado.items.length,
+                        itemBuilder: (context, index) {
+                          return VisitListItemWidget(
+                            visita: paginado.items[index],
+                            onTap: () {},
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             );
           }
 
           return const SizedBox.shrink();
         },
+        ),
       ),
     );
   }

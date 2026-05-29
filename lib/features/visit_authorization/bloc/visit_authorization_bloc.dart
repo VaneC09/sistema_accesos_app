@@ -14,6 +14,7 @@ import '../data/authorization_model.dart';
 import '../data/authorization_repository.dart';
 import '../../../core/errors/app_exceptions.dart';
 import '../../../core/errors/app_logger.dart';
+import '../../../core/models/paginacion_model.dart';
 
 // ── Eventos ──────────────────────────────────────────────────────────────────
 abstract class VisitAuthorizationEvent extends Equatable {
@@ -23,7 +24,15 @@ abstract class VisitAuthorizationEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class CargarPendientes extends VisitAuthorizationEvent {}
+class CargarPendientes extends VisitAuthorizationEvent {
+  final String? estado;
+  final int pagina;
+
+  const CargarPendientes({this.estado, this.pagina = 1});
+
+  @override
+  List<Object?> get props => [estado, pagina];
+}
 
 class CargarDetalle extends VisitAuthorizationEvent {
   final int idSolicitud;
@@ -70,11 +79,15 @@ class VisitAuthorizationLoading extends VisitAuthorizationState {}
 
 class PendientesLoaded extends VisitAuthorizationState {
   final List<AuthorizationModel> pendientes;
+  final PaginacionModel paginacion;
 
-  const PendientesLoaded({required this.pendientes});
+  const PendientesLoaded({
+    required this.pendientes,
+    required this.paginacion,
+  });
 
   @override
-  List<Object?> get props => [pendientes];
+  List<Object?> get props => [pendientes, paginacion];
 }
 
 class DetalleLoaded extends VisitAuthorizationState {
@@ -125,9 +138,15 @@ class VisitAuthorizationBloc
       ) async {
     emit(VisitAuthorizationLoading());
     try {
-      final pendientes = await _repository.obtenerPendientes();
-      AppLogger.info(_modulo, 'Pendientes cargados: ${pendientes.length}');
-      emit(PendientesLoaded(pendientes: pendientes));
+      final resultado = await _repository.obtenerPendientes(
+        estado: event.estado,
+        pagina: event.pagina,
+      );
+      AppLogger.info(_modulo, 'Pendientes cargados: ${resultado.items.length}');
+      emit(PendientesLoaded(
+        pendientes: resultado.items,
+        paginacion: resultado.paginacion,
+      ));
     } on AppException catch (e) {
       emit(VisitAuthorizationError(mensaje: e.mensaje));
     } catch (e) {

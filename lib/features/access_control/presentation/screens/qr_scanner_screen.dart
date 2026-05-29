@@ -113,7 +113,8 @@ class _QrScannerViewState extends State<_QrScannerView> {
   // ── Ingreso manual ────────────────────────────────────────────────────────
   Future<void> _onRegistroManual() async {
     final codigo = await ManualCodeDialog.mostrar(context);
-    if (codigo == null || !context.mounted) return;
+    if (!mounted) return;
+    if (codigo == null) return;
 
     if (_telefono.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,6 +129,7 @@ class _QrScannerViewState extends State<_QrScannerView> {
     setState(() => _escaneando = false);
     _scannerController?.stop();
 
+    if (!mounted) return;
     context.read<AccessControlBloc>().add(
       RegistroManual(
         codigoNumerico: codigo,
@@ -173,7 +175,6 @@ class _QrScannerViewState extends State<_QrScannerView> {
               child: QrResultWidget(
                 resultado: state.resultado,
                 onNuevoEscaneo: _onNuevoEscaneo,
-                onExtenderTiempo: state.resultado.llegaTarde ? () {} : null,
               ),
             );
           }
