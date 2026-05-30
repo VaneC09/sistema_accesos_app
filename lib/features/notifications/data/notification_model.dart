@@ -31,6 +31,7 @@ class NotificationModel {
   final int? idSolicitud;
   final String? folio;
   final String? nombreVisitante;
+  final String? estadoSolicitud;
 
   const NotificationModel({
     required this.id,
@@ -42,6 +43,7 @@ class NotificationModel {
     this.idSolicitud,
     this.folio,
     this.nombreVisitante,
+    this.estadoSolicitud,
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
@@ -67,7 +69,24 @@ class NotificationModel {
       idSolicitud:    _toNullableInt(json['id_solicitud']),
       folio:          json['folio']?.toString(),
       nombreVisitante:json['nombre_visitante']?.toString(),
+      estadoSolicitud: _parseEstadoSolicitud(json),
     );
+  }
+
+  static String? _parseEstadoSolicitud(Map<String, dynamic> json) {
+    final directo = json['estado_solicitud']?.toString().trim();
+    if (directo != null && directo.isNotEmpty) return directo;
+
+    final estado = json['estado'];
+    if (estado is Map) {
+      final nombre = estado['nombre']?.toString().trim();
+      if (nombre != null && nombre.isNotEmpty) return nombre;
+    }
+
+    final plano = json['estado_nombre']?.toString().trim();
+    if (plano != null && plano.isNotEmpty) return plano;
+
+    return null;
   }
 
   static TipoNotificacion _parseTipo(String tipo) {
@@ -184,6 +203,27 @@ class NotificationModel {
     }
   }
 
+  /// Estado de solicitud inferido del tipo cuando el API no lo envía.
+  String get estadoInferido {
+    switch (tipo) {
+      case TipoNotificacion.solicitudAutorizada:
+      case TipoNotificacion.visitanteIngreso:
+      case TipoNotificacion.visitanteSalida:
+      case TipoNotificacion.visitanteLlegadaTarde:
+      case TipoNotificacion.permanenciaExcedida:
+      case TipoNotificacion.qrExtendido:
+        return 'Autorizada';
+      case TipoNotificacion.solicitudRechazada:
+        return 'Rechazada';
+      case TipoNotificacion.solicitudCancelada:
+        return 'Cancelada';
+      case TipoNotificacion.nuevaSolicitudPendiente:
+      case TipoNotificacion.solicitudExtension:
+      case TipoNotificacion.qrExpiradoTolerancia:
+        return 'Pendiente';
+    }
+  }
+
   /// Indica si requiere acción del usuario (navegar a detalle de solicitud)
   bool get requiereAccion {
     return tipo == TipoNotificacion.qrExpiradoTolerancia ||
@@ -216,6 +256,7 @@ class NotificationModel {
       idSolicitud:     idSolicitud,
       folio:           folio,
       nombreVisitante: nombreVisitante,
+      estadoSolicitud: estadoSolicitud,
     );
   }
 }

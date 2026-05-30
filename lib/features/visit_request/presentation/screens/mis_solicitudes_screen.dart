@@ -18,7 +18,6 @@ import '../../../../core/widgets/estado_filtro_bar_widget.dart';
 import '../../../../core/widgets/error_widget.dart';
 import '../../../../core/widgets/loading_widget.dart';
 import '../../../../core/widgets/empty_list_state_widget.dart';
-import '../../../../core/widgets/list_stats_header_widget.dart';
 import '../../../../core/widgets/paginated_list_column_widget.dart';
 import '../../bloc/visit_request_bloc.dart';
 import '../../data/visit_request_repository.dart';
@@ -124,60 +123,47 @@ class _MisSolicitudesViewState extends State<_MisSolicitudesView> {
                     );
                   }
 
-                  return Column(
-                    children: [
-                      ListStatsHeaderWidget(
-                        titulo: 'Mis solicitudes de visita',
-                        paginacion: state.paginacion,
-                        icono: Icons.description_outlined,
-                      ),
-                      Expanded(
-                        child: PaginatedListColumnWidget(
-                          paginacion: state.paginacion,
-                          onPaginaSeleccionada: (pagina) =>
-                              _cargar(pagina: pagina),
-                          child: RefreshIndicator(
-                            color: AppColors.primaryCoral,
-                            onRefresh: () async => _cargar(),
-                            child: ListView.builder(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.all(AppSpacing.md),
-                              itemCount: state.solicitudes.length,
-                              itemBuilder: (context, index) {
-                                final solicitud = state.solicitudes[index];
+                  return PaginatedListColumnWidget(
+                    paginacion: state.paginacion,
+                    onPaginaSeleccionada: (pagina) => _cargar(pagina: pagina),
+                    child: RefreshIndicator(
+                      color: AppColors.primaryCoral,
+                      onRefresh: () async => _cargar(),
+                      child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        itemCount: state.solicitudes.length,
+                        itemBuilder: (context, index) {
+                          final solicitud = state.solicitudes[index];
 
-                                return SolicitudCardWidget(
-                                  solicitud: solicitud,
-                                  onTap: () {
-                                    if (solicitud.idSolicitud == null) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'No se pudo abrir el detalle de la solicitud',
-                                          ),
-                                          backgroundColor: AppColors.actionRed,
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => VisitDetailScreen(
-                                          idSolicitud: solicitud.idSolicitud!,
-                                        ),
-                                      ),
-                                    );
-                                  },
+                          return SolicitudCardWidget(
+                            solicitud: solicitud,
+                            onTap: () {
+                              if (solicitud.idSolicitud == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'No se pudo abrir el detalle de la solicitud',
+                                    ),
+                                    backgroundColor: AppColors.actionRed,
+                                  ),
                                 );
-                              },
-                            ),
-                          ),
-                        ),
+                                return;
+                              }
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => VisitDetailScreen(
+                                    idSolicitud: solicitud.idSolicitud!,
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
                       ),
-                    ],
+                    ),
                   );
                 }
 

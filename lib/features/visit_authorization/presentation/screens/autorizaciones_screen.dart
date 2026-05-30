@@ -17,7 +17,6 @@ import '../../../../core/widgets/safe_scaffold_body_widget.dart';
 import '../../../../core/widgets/estado_filtro_bar_widget.dart';
 import '../../../../core/widgets/loading_widget.dart';
 import '../../../../core/widgets/empty_list_state_widget.dart';
-import '../../../../core/widgets/list_stats_header_widget.dart';
 import '../../../../core/widgets/paginated_list_column_widget.dart';
 import 'package:sistema_accesos_app/core/widgets/error_widget.dart';
 import '../../bloc/visit_authorization_bloc.dart';
@@ -138,56 +137,43 @@ class _AutorizacionesViewState extends State<_AutorizacionesView> {
                     );
                   }
 
-                  return Column(
-                    children: [
-                      ListStatsHeaderWidget(
-                        titulo: 'Solicitudes por autorizar',
-                        paginacion: state.paginacion,
-                        icono: Icons.approval_rounded,
-                      ),
-                      Expanded(
-                        child: PaginatedListColumnWidget(
-                          paginacion: state.paginacion,
-                          onPaginaSeleccionada: (pagina) =>
-                              _recargar(pagina: pagina),
-                          child: RefreshIndicator(
-                            color: AppColors.primaryCoral,
-                            onRefresh: () async => _recargar(),
-                            child: ListView.builder(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.all(AppSpacing.md),
-                              itemCount: state.pendientes.length,
-                              itemBuilder: (context, index) {
-                                final solicitud = state.pendientes[index];
+                  return PaginatedListColumnWidget(
+                    paginacion: state.paginacion,
+                    onPaginaSeleccionada: (pagina) =>
+                        _recargar(pagina: pagina),
+                    child: RefreshIndicator(
+                      color: AppColors.primaryCoral,
+                      onRefresh: () async => _recargar(),
+                      child: ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        itemCount: state.pendientes.length,
+                        itemBuilder: (context, index) {
+                          final solicitud = state.pendientes[index];
 
-                                return AuthorizationCardWidget(
-                                  solicitud: solicitud,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => BlocProvider(
-                                          create: (_) =>
-                                              VisitAuthorizationBloc(
-                                            repository:
-                                                AuthorizationRepository(),
-                                          ),
-                                          child: AuthorizationDetailScreen(
-                                            solicitud: solicitud,
-                                          ),
-                                        ),
-                                      ),
-                                    ).then((_) {
-                                      if (mounted) _recargar();
-                                    });
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                        ),
+                          return AuthorizationCardWidget(
+                            solicitud: solicitud,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BlocProvider(
+                                    create: (_) => VisitAuthorizationBloc(
+                                      repository: AuthorizationRepository(),
+                                    ),
+                                    child: AuthorizationDetailScreen(
+                                      solicitud: solicitud,
+                                    ),
+                                  ),
+                                ),
+                              ).then((_) {
+                                if (mounted) _recargar();
+                              });
+                            },
+                          );
+                        },
                       ),
-                    ],
+                    ),
                   );
                 }
 

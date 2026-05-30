@@ -4,7 +4,7 @@
 // Módulo    : features/visit_authorization/data
 // Autor     : Omega Company
 // Fecha     : 2026-05-23
-// Versión   : 1.0.0
+// Versión   : 1.1.0
 // Descripción: Fuente de datos de autorización — RF-019, RF-020
 // =============================================================================
 
@@ -13,6 +13,8 @@ import '../../../core/connection/api_response_helper.dart';
 import '../../../core/constants/filtro_estado_solicitud.dart';
 import '../../../core/errors/app_logger.dart';
 import '../../../core/models/paginated_result.dart';
+import '../../../core/utils/paginacion_local.dart';
+import '../../../core/utils/paginacion_remota.dart';
 import 'authorization_model.dart';
 
 class AuthorizationDatasource {
@@ -28,18 +30,39 @@ class AuthorizationDatasource {
   }) async {
     AppLogger.info(_modulo, 'Obteniendo solicitudes del autorizador');
 
-    final parametros = <String, dynamic>{
-      'page': pagina,
-      'filtro': FiltroEstadoSolicitud.parametroAutorizador(estado),
-    };
+    if (!_tieneFiltroEstado(estado)) {
+      return _obtenerPagina(pagina: pagina);
+    }
 
+    final todas = await PaginacionRemota.recopilarPaginas(
+      obtenerPagina: (p) => _obtenerPagina(pagina: p),
+    );
+
+    final filtradas = todas
+        .where((s) => FiltroEstadoSolicitud.coincideEstado(estado, s.estado))
+        .toList();
+
+    return PaginacionLocal.paginar(filtradas, pagina: pagina);
+  }
+
+  bool _tieneFiltroEstado(String? estado) {
+    return estado != null && estado != FiltroEstadoSolicitud.todos;
+  }
+
+  Future<PaginatedResult<AuthorizationModel>> _obtenerPagina({
+    required int pagina,
+  }) async {
     final respuesta = await _apiClient.get(
       '/autorizador/solicitudes',
-      parametros: parametros,
+      parametros: {
+        'page': pagina,
+        'filtro': 'todos',
+      },
     );
 
     final mapas = ApiResponseHelper.extraerMapas(respuesta.data);
     final items = mapas.map(AuthorizationModel.fromJson).toList();
+
     final paginacion = ApiResponseHelper.extraerPaginacion(
       respuesta.data,
       cantidadItems: items.length,

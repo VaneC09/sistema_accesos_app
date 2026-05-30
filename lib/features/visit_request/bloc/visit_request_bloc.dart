@@ -25,7 +25,14 @@ abstract class VisitRequestEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class CargarCatalogos extends VisitRequestEvent {}
+class CargarCatalogos extends VisitRequestEvent {
+  final int idEscuela;
+
+  const CargarCatalogos({this.idEscuela = 1});
+
+  @override
+  List<Object?> get props => [idEscuela];
+}
 
 class VisitRequestSubmitted extends VisitRequestEvent {
   final VisitRequestModel solicitud;
@@ -96,15 +103,17 @@ class VisitRequestLoading extends VisitRequestState {}
 
 class CatalogosLoaded extends VisitRequestState {
   final List<CatalogoModel> tiposVisita;
-  final List<CatalogoModel> departamentos;
+  final List<CatalogoModel> edificios;
+  final String nombreEscuela;
 
   const CatalogosLoaded({
     required this.tiposVisita,
-    required this.departamentos,
+    required this.edificios,
+    required this.nombreEscuela,
   });
 
   @override
-  List<Object?> get props => [tiposVisita, departamentos];
+  List<Object?> get props => [tiposVisita, edificios, nombreEscuela];
 }
 
 class VisitRequestSuccess extends VisitRequestState {
@@ -171,10 +180,13 @@ class VisitRequestBloc extends Bloc<VisitRequestEvent, VisitRequestState> {
     emit(VisitRequestLoading());
     try {
       final tiposVisita = await _repository.obtenerTiposVisita();
-      final departamentos = await _repository.obtenerDepartamentos();
+      final edificios = await _repository.obtenerEdificios(
+        idEscuela: event.idEscuela,
+      );
       emit(CatalogosLoaded(
         tiposVisita: tiposVisita,
-        departamentos: departamentos,
+        edificios: edificios.items,
+        nombreEscuela: edificios.nombreEscuela,
       ));
     } on AppException catch (e) {
       AppLogger.error(_modulo, 'Error cargando catálogos: ${e.mensaje}');

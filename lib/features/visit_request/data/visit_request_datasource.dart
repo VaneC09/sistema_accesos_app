@@ -8,6 +8,7 @@
 // Cambio    : Agrega consumo de endpoint para enviar QR al visitante.
 // =============================================================================
 
+import '../../../core/constants/catalogo_edificios.dart';
 import '../../../core/constants/filtro_estado_solicitud.dart';
 import '../../../core/connection/api_client.dart';
 import '../../../core/connection/api_response_helper.dart';
@@ -59,7 +60,14 @@ class VisitRequestDatasource {
     );
 
     final mapas = ApiResponseHelper.extraerMapas(respuesta.data);
-    final items = mapas.map(VisitRequestModel.fromJson).toList();
+    var items = mapas.map(VisitRequestModel.fromJson).toList();
+
+    if (estado != null) {
+      items = items
+          .where((s) => FiltroEstadoSolicitud.coincideEstado(estado, s.estado))
+          .toList();
+    }
+
     final paginacion = ApiResponseHelper.extraerPaginacion(
       respuesta.data,
       cantidadItems: items.length,
@@ -106,6 +114,41 @@ class VisitRequestDatasource {
     return lista
         .map((d) => CatalogoModel.fromJson(d as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<EdificiosCatalogoResult> obtenerEdificios({
+    int idEscuela = CatalogoEdificios.escuelaToluca,
+  }) async {
+    try {
+      final respuesta = await _apiClient.get(
+        '/catalogos/edificios',
+        parametros: {'id_escuela': idEscuela},
+      );
+
+      final data = respuesta.data as Map<String, dynamic>;
+      final payload = data['data'] as Map<String, dynamic>? ?? {};
+      final lista = payload['edificios'] as List<dynamic>? ?? [];
+
+      if (lista.isNotEmpty) {
+        return EdificiosCatalogoResult(
+          items: lista
+              .map((d) => CatalogoModel.fromJson(d as Map<String, dynamic>))
+              .toList(),
+          nombreEscuela: payload['nombre_escuela']?.toString() ??
+              CatalogoEdificios.nombreEscuela(idEscuela),
+        );
+      }
+    } catch (e) {
+      AppLogger.warning(
+        _modulo,
+        'Catálogo de edificios no disponible en API, usando local: $e',
+      );
+    }
+
+    return EdificiosCatalogoResult(
+      items: CatalogoEdificios.porEscuela(idEscuela),
+      nombreEscuela: CatalogoEdificios.nombreEscuela(idEscuela),
+    );
   }
 
   Future<String> enviarQr(int idSolicitud) async {

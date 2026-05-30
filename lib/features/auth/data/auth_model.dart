@@ -4,13 +4,16 @@
 // Módulo    : features/auth/data
 // Autor     : Omega Company
 // Fecha     : 2026-05-29
-// Versión   : 1.3.0
+// Versión   : 1.4.0
 // Correcciones:
 //   - Conserva telefono y area para vigilante.
 //   - Agrega roles para usuarios con más de un rol.
+//   - Agrega id_escuela para catálogo de edificios.
 // =============================================================================
 
 import 'dart:convert';
+
+import '../../../core/constants/catalogo_edificios.dart';
 
 class AuthModel {
   final String token;
@@ -23,6 +26,8 @@ class AuthModel {
   final String correoPuesto;
   final int idEmpleado;
   final int idDepartamento;
+  final int idEscuela;
+  final String nombreEscuela;
   final String puesto;
 
   // Campos exclusivos del vigilante
@@ -41,27 +46,35 @@ class AuthModel {
     required this.idEmpleado,
     required this.idDepartamento,
     required this.puesto,
+    this.idEscuela = CatalogoEdificios.escuelaToluca,
+    this.nombreEscuela = 'Instituto Tecnológico de Toluca',
     this.telefono = '',
     this.area = '',
   });
 
   factory AuthModel.fromJson(Map<String, dynamic> json) {
     final String rol =
-    (json['rol'] ?? 'solicitante').toString().toLowerCase().trim();
+        (json['rol'] ?? 'solicitante').toString().toLowerCase().trim();
 
     final String rolApi =
-    (json['rol_api'] ?? rol).toString().toLowerCase().trim();
+        (json['rol_api'] ?? rol).toString().toLowerCase().trim();
 
     final List<String> roles = (json['roles'] as List<dynamic>?)
-        ?.map((e) => e.toString().toLowerCase().trim())
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList() ??
+            ?.map((e) => e.toString().toLowerCase().trim())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList() ??
         [rol];
 
     if (!roles.contains(rol)) {
       roles.add(rol);
     }
+
+    final idEscuela = (json['id_escuela'] as int?) ??
+        int.tryParse(json['id_escuela']?.toString() ?? '') ??
+        CatalogoEdificios.escuelaToluca;
+
+    final nombreEscuela = json['nombre_escuela']?.toString().trim();
 
     return AuthModel(
       token: (json['token'] as String?) ?? '',
@@ -76,6 +89,10 @@ class AuthModel {
           (json['id'] as int?) ??
           0,
       idDepartamento: (json['id_departamento'] as int?) ?? 0,
+      idEscuela: idEscuela > 0 ? idEscuela : CatalogoEdificios.escuelaToluca,
+      nombreEscuela: (nombreEscuela != null && nombreEscuela.isNotEmpty)
+          ? nombreEscuela
+          : CatalogoEdificios.nombreEscuela(idEscuela),
       puesto: rolApi,
       telefono: (json['telefono'] as String?) ?? '',
       area: (json['area'] as String?) ?? '',
@@ -103,6 +120,8 @@ class AuthModel {
       correoPuesto: correoPuesto,
       idEmpleado: idEmpleado,
       idDepartamento: idDepartamento,
+      idEscuela: idEscuela,
+      nombreEscuela: nombreEscuela,
       puesto: puesto,
       telefono: telefono,
       area: area,
@@ -112,19 +131,21 @@ class AuthModel {
   bool get tieneTokenSanctum => token.isNotEmpty;
 
   Map<String, dynamic> toJson() => {
-    'token': token,
-    'email': usuario,
-    'rol': rol,
-    'rol_api': rolApi,
-    'roles': roles,
-    'name': nombre,
-    'departamento': correoPuesto,
-    'id_empleado_sam': idEmpleado,
-    'id_departamento': idDepartamento,
-    'puesto': puesto,
-    'telefono': telefono,
-    'area': area,
-  };
+        'token': token,
+        'email': usuario,
+        'rol': rol,
+        'rol_api': rolApi,
+        'roles': roles,
+        'name': nombre,
+        'departamento': correoPuesto,
+        'id_empleado_sam': idEmpleado,
+        'id_departamento': idDepartamento,
+        'id_escuela': idEscuela,
+        'nombre_escuela': nombreEscuela,
+        'puesto': puesto,
+        'telefono': telefono,
+        'area': area,
+      };
 
   @override
   String toString() => json.encode(toJson());

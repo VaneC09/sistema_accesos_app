@@ -4,7 +4,7 @@
 // Módulo    : features/notifications/data
 // Autor     : Omega Company
 // Fecha     : 2026-05-29
-// Versión   : 1.2.0
+// Versión   : 1.3.0
 // Descripción: Repositorio de notificaciones — RF-023
 // =============================================================================
 
@@ -14,6 +14,8 @@ import '../../../core/constants/filtro_estado_solicitud.dart';
 import '../../../core/errors/app_exceptions.dart';
 import '../../../core/errors/app_logger.dart';
 import '../../../core/models/paginated_result.dart';
+import '../../../core/utils/paginacion_local.dart';
+import '../../../core/utils/paginacion_remota.dart';
 import 'notification_model.dart';
 
 class NotificationRepository {
@@ -28,18 +30,27 @@ class NotificationRepository {
     String? estado,
   }) async {
     try {
-      final parametros = <String, dynamic>{'page': pagina};
-      final estadoApi = FiltroEstadoSolicitud.parametroNotificaciones(estado);
-      if (estadoApi != null) parametros['estado'] = estadoApi;
+      if (!_tieneFiltroEstado(estado)) {
+        return _obtenerPaginaNotificaciones(
+          ruta: '/notificaciones',
+          pagina: pagina,
+          etiqueta: 'GET /notificaciones',
+        );
+      }
 
-      final respuesta = await _apiClient.get(
-        '/notificaciones',
-        parametros: parametros,
+      final todas = await PaginacionRemota.recopilarPaginas(
+        obtenerPagina: (p) => _obtenerPaginaNotificaciones(
+          ruta: '/notificaciones',
+          pagina: p,
+          etiqueta: 'GET /notificaciones',
+        ),
       );
-      return _mapearNotificaciones(
-        respuesta.data,
-        etiqueta: 'GET /notificaciones',
-      );
+
+      final filtradas = todas
+          .where((n) => _coincideFiltroNotificacion(estado!, n))
+          .toList();
+
+      return PaginacionLocal.paginar(filtradas, pagina: pagina);
     } on NotFoundException {
       AppLogger.error(
         _modulo,
@@ -59,21 +70,29 @@ class NotificationRepository {
     String? estado,
   }) async {
     try {
-      final parametros = <String, dynamic>{
-        'telefono': telefono,
-        'page': pagina,
-      };
-      final estadoApi = FiltroEstadoSolicitud.parametroNotificaciones(estado);
-      if (estadoApi != null) parametros['estado'] = estadoApi;
+      if (!_tieneFiltroEstado(estado)) {
+        return _obtenerPaginaNotificaciones(
+          ruta: '/vigilante/notificaciones',
+          pagina: pagina,
+          etiqueta: 'GET /vigilante/notificaciones',
+          parametrosExtra: {'telefono': telefono},
+        );
+      }
 
-      final respuesta = await _apiClient.get(
-        '/vigilante/notificaciones',
-        parametros: parametros,
+      final todas = await PaginacionRemota.recopilarPaginas(
+        obtenerPagina: (p) => _obtenerPaginaNotificaciones(
+          ruta: '/vigilante/notificaciones',
+          pagina: p,
+          etiqueta: 'GET /vigilante/notificaciones',
+          parametrosExtra: {'telefono': telefono},
+        ),
       );
-      return _mapearNotificaciones(
-        respuesta.data,
-        etiqueta: 'GET /vigilante/notificaciones',
-      );
+
+      final filtradas = todas
+          .where((n) => _coincideFiltroNotificacion(estado!, n))
+          .toList();
+
+      return PaginacionLocal.paginar(filtradas, pagina: pagina);
     } catch (e, st) {
       AppLogger.error(
         _modulo,
@@ -83,18 +102,43 @@ class NotificationRepository {
     }
   }
 
+  bool _tieneFiltroEstado(String? estado) {
+    return estado != null && estado != FiltroEstadoSolicitud.todos;
+  }
+
+  Future<PaginatedResult<NotificationModel>> _obtenerPaginaNotificaciones({
+    required String ruta,
+    required int pagina,
+    required String etiqueta,
+    Map<String, dynamic>? parametrosExtra,
+  }) async {
+    final parametros = <String, dynamic>{'page': pagina};
+    if (parametrosExtra != null) parametros.addAll(parametrosExtra);
+
+    final respuesta = await _apiClient.get(ruta, parametros: parametros);
+    return _mapearNotificaciones(respuesta.data, etiqueta: etiqueta);
+  }
+
   PaginatedResult<NotificationModel> _mapearNotificaciones(
     dynamic body, {
     required String etiqueta,
   }) {
     final mapas = ApiResponseHelper.extraerMapas(body, etiqueta: etiqueta);
     final items = mapas.map(NotificationModel.fromJson).toList();
+
     final paginacion = ApiResponseHelper.extraerPaginacion(
       body,
       cantidadItems: items.length,
     );
 
     return PaginatedResult(items: items, paginacion: paginacion);
+  }
+
+  bool _coincideFiltroNotificacion(String chip, NotificationModel notificacion) {
+    return FiltroEstadoSolicitud.coincideEstado(
+      chip,
+      notificacion.estadoInferido,
+    );
   }
 
   Future<void> marcarLeida(String idNotificacion) async {

@@ -65,7 +65,7 @@ class AppStrings {
   static const String labelVisitaGrupal = 'Visita grupal';
   static const String labelNombreVisitante = 'Nombre del visitante';
   static const String labelCorreoVisitante = 'Correo del visitante';
-  static const String labelLugarDestino = 'Lugar destino';
+  static const String labelLugarDestino = 'Edificio destino';
   static const String labelFecha = 'Fecha';
   static const String labelHora = 'Hora';
   static const String labelMotivo = 'Motivo de visita';
@@ -85,6 +85,7 @@ class AppStrings {
       'No se permiten correos duplicados en el grupo';
   static const String errorTipoVisita = 'Seleccione el tipo de visitante';
   static const String errorDepartamento = 'Seleccione el departamento destino';
+  static const String errorEdificioDestino = 'Seleccione el edificio destino';
   static const String errorSolicitudFallida =
       'No fue posible crear la solicitud. Intente nuevamente';
   static const String errorCatalogoNoDisponible =

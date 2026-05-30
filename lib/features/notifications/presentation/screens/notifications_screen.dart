@@ -14,7 +14,6 @@ import '../../../../core/models/paginacion_model.dart';
 import '../../../../core/widgets/safe_scaffold_body_widget.dart';
 import '../../../../core/widgets/empty_list_state_widget.dart';
 import '../../../../core/widgets/estado_filtro_bar_widget.dart';
-import '../../../../core/widgets/list_stats_header_widget.dart';
 import '../../../../core/widgets/loading_widget.dart';
 import '../../../../core/widgets/paginated_list_column_widget.dart';
 import 'package:sistema_accesos_app/core/widgets/error_widget.dart';
@@ -145,75 +144,50 @@ class _NotificationsView extends StatelessWidget {
                 final paginacion = _extraerPaginacion(state);
 
                 if (notificaciones.isEmpty) {
-                  return Column(
-                    children: [
-                      ListStatsHeaderWidget(
-                        titulo: 'Bandeja de notificaciones',
-                        paginacion: paginacion,
-                        icono: Icons.notifications_none_rounded,
-                      ),
-                      Expanded(
-                        child: PaginatedListColumnWidget(
-                          paginacion: paginacion,
-                          onPaginaSeleccionada: (pagina) =>
-                              onCargar(pagina: pagina),
-                          child: RefreshIndicator(
-                            color: AppColors.primaryCoral,
-                            onRefresh: () async => onCargar(),
-                            child: ListView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              children: [
-                                EmptyListStateWidget(
-                                  icono: Icons.notifications_off_outlined,
-                                  titulo: filtroEstado == null
-                                      ? 'No tienes notificaciones'
-                                      : 'No tienes notificaciones $filtroEstado',
-                                  subtitulo:
-                                      'Los avisos de visitas y solicitudes aparecerán aquí.',
-                                  accionTexto: 'Actualizar',
-                                  onAccion: () => onCargar(),
-                                ),
-                              ],
-                            ),
+                  return PaginatedListColumnWidget(
+                    paginacion: paginacion,
+                    onPaginaSeleccionada: (pagina) => onCargar(pagina: pagina),
+                    child: RefreshIndicator(
+                      color: AppColors.primaryCoral,
+                      onRefresh: () async => onCargar(),
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          EmptyListStateWidget(
+                            icono: Icons.notifications_off_outlined,
+                            titulo: filtroEstado == null
+                                ? 'No tienes notificaciones'
+                                : 'No tienes notificaciones $filtroEstado',
+                            subtitulo:
+                                'Los avisos de visitas y solicitudes aparecerán aquí.',
+                            accionTexto: 'Actualizar',
+                            onAccion: () => onCargar(),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   );
                 }
 
-                return Column(
-                  children: [
-                    ListStatsHeaderWidget(
-                      titulo: 'Bandeja de notificaciones',
-                      paginacion: paginacion,
-                      icono: Icons.notifications_active_rounded,
+                return PaginatedListColumnWidget(
+                  paginacion: paginacion,
+                  onPaginaSeleccionada: (pagina) => onCargar(pagina: pagina),
+                  child: RefreshIndicator(
+                    color: AppColors.primaryCoral,
+                    onRefresh: () async => onCargar(),
+                    child: ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      itemCount: notificaciones.length,
+                      itemBuilder: (context, index) {
+                        final notificacion = notificaciones[index];
+                        return _NotificationCard(
+                          notificacion: notificacion,
+                          onTap: () => _manejarToque(context, notificacion),
+                        );
+                      },
                     ),
-                    Expanded(
-                      child: PaginatedListColumnWidget(
-                        paginacion: paginacion,
-                        onPaginaSeleccionada: (pagina) =>
-                            onCargar(pagina: pagina),
-                        child: RefreshIndicator(
-                          color: AppColors.primaryCoral,
-                          onRefresh: () async => onCargar(),
-                          child: ListView.builder(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            itemCount: notificaciones.length,
-                            itemBuilder: (context, index) {
-                              final notificacion = notificaciones[index];
-                              return _NotificationCard(
-                                notificacion: notificacion,
-                                onTap: () =>
-                                    _manejarToque(context, notificacion),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 );
               },
             ),

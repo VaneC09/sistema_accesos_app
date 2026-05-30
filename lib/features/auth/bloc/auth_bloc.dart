@@ -89,6 +89,8 @@ class AuthAuthenticated extends AuthState {
   final String correoPuesto;
   final int idEmpleado;
   final int idDepartamento;
+  final int idEscuela;
+  final String nombreEscuela;
 
   const AuthAuthenticated({
     required this.rol,
@@ -98,18 +100,22 @@ class AuthAuthenticated extends AuthState {
     required this.correoPuesto,
     required this.idEmpleado,
     required this.idDepartamento,
+    this.idEscuela = 1,
+    this.nombreEscuela = 'Instituto Tecnológico de Toluca',
   });
 
   @override
   List<Object> get props => [
-    rol,
-    roles,
-    nombre,
-    correoPersonal,
-    correoPuesto,
-    idEmpleado,
-    idDepartamento,
-  ];
+        rol,
+        roles,
+        nombre,
+        correoPersonal,
+        correoPuesto,
+        idEmpleado,
+        idDepartamento,
+        idEscuela,
+        nombreEscuela,
+      ];
 }
 
 class AuthError extends AuthState {
@@ -209,6 +215,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         correoPuesto: modelo.correoPuesto,
         idEmpleado: modelo.idEmpleado,
         idDepartamento: modelo.idDepartamento,
+        idEscuela: modelo.idEscuela,
+        nombreEscuela: modelo.nombreEscuela,
       ));
     } on ValidationException catch (e) {
       emit(AuthError(mensaje: e.mensaje));
@@ -281,6 +289,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         correoPuesto: modelo.correoPuesto,
         idEmpleado: modelo.idEmpleado,
         idDepartamento: modelo.idDepartamento,
+        idEscuela: modelo.idEscuela,
+        nombreEscuela: modelo.nombreEscuela,
       ));
     } on ValidationException catch (e) {
       emit(AuthError(mensaje: e.mensaje));
@@ -359,6 +369,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         correoPuesto: modelo.correoPuesto,
         idEmpleado: modelo.idEmpleado,
         idDepartamento: modelo.idDepartamento,
+        idEscuela: modelo.idEscuela,
+        nombreEscuela: modelo.nombreEscuela,
       ));
     } catch (_) {
       emit(const AuthUnauthenticated());

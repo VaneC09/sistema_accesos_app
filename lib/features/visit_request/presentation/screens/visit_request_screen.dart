@@ -3,8 +3,8 @@
 // Archivo   : visit_request_screen.dart
 // Módulo    : features/visit_request/presentation/screens
 // Autor     : Omega Company
-// Fecha     : 2026-05-25
-// Versión   : 1.0.0
+// Fecha     : 2026-05-29
+// Versión   : 1.1.0
 // Descripción: Pantalla de nueva solicitud de visita — RF-013, RF-014
 // =============================================================================
 
@@ -15,6 +15,9 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/widgets/loading_widget.dart';
 import '../../../../core/widgets/primary_button_widget.dart';
+import '../../../../core/widgets/safe_scaffold_body_widget.dart';
+import 'package:sistema_accesos_app/core/widgets/error_widget.dart';
+import '../../../auth/bloc/auth_bloc.dart';
 import '../../bloc/visit_request_bloc.dart';
 import '../../data/visit_request_model.dart';
 import '../widgets/visitante_form_widget.dart';
@@ -29,7 +32,6 @@ class VisitRequestScreen extends StatefulWidget {
 class _VisitRequestScreenState extends State<VisitRequestScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _lugarController = TextEditingController();
   final _motivoController = TextEditingController();
 
   bool _esGrupal = false;
@@ -40,6 +42,12 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
   int _toleranciaDespues = 15;
 
   String _tipoVisita = 'Personal';
+  String _edificioSeleccionado = '';
+
+  List<CatalogoModel> _tiposVisita = const [];
+  List<CatalogoModel> _edificios = const [];
+  String _nombreEscuela = '';
+  bool _catalogosListos = false;
 
   // Visitante individual
   final _nombreController = TextEditingController();
@@ -54,7 +62,6 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
 
   @override
   void dispose() {
-    _lugarController.dispose();
     _motivoController.dispose();
 
     _nombreController.dispose();
@@ -68,6 +75,25 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
     }
 
     super.dispose();
+  }
+
+  void _aplicarCatalogos(CatalogosLoaded state) {
+    setState(() {
+      _tiposVisita = state.tiposVisita;
+      _edificios = state.edificios;
+      _nombreEscuela = state.nombreEscuela;
+      _catalogosListos = true;
+
+      if (_tiposVisita.isNotEmpty &&
+          !_tiposVisita.any((t) => t.nombre == _tipoVisita)) {
+        _tipoVisita = _tiposVisita.first.nombre;
+      }
+
+      if (_edificioSeleccionado.isNotEmpty &&
+          !_edificios.any((e) => e.nombre == _edificioSeleccionado)) {
+        _edificioSeleccionado = '';
+      }
+    });
   }
 
   void _agregarVisitante() {
@@ -162,11 +188,11 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
       visitantes = _visitantesGrupales
           .map(
             (v) => VisitanteModel(
-          nombre: v['nombre']!.text.trim(),
-          apellidos: v['apellidos']!.text.trim(),
-          correo: v['correo']!.text.trim(),
-        ),
-      )
+              nombre: v['nombre']!.text.trim(),
+              apellidos: v['apellidos']!.text.trim(),
+              correo: v['correo']!.text.trim(),
+            ),
+          )
           .toList();
 
       final correos = visitantes.map((v) => v.correo).toList();
@@ -194,7 +220,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
       tipoVisita: _tipoVisita,
       esGrupal: _esGrupal,
       visitantes: visitantes,
-      lugarDestino: _lugarController.text.trim(),
+      lugarDestino: _edificioSeleccionado,
       fechaVisita: fechaCompleta,
       motivoVisita: _motivoController.text.trim(),
       toleranciaAntesMinutos: _toleranciaAntes,
@@ -202,14 +228,28 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
     );
 
     context.read<VisitRequestBloc>().add(
-      VisitRequestSubmitted(solicitud: solicitud),
-    );
+          VisitRequestSubmitted(solicitud: solicitud),
+        );
+  }
+
+  void _reintentarCatalogos() {
+    final authState = context.read<AuthBloc>().state;
+    final idEscuela =
+        authState is AuthAuthenticated ? authState.idEscuela : 1;
+
+    context.read<VisitRequestBloc>().add(
+          CargarCatalogos(idEscuela: idEscuela),
+        );
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<VisitRequestBloc, VisitRequestState>(
       listener: (context, state) {
+        if (state is CatalogosLoaded) {
+          _aplicarCatalogos(state);
+        }
+
         if (state is VisitRequestSuccess) {
           showDialog(
             context: context,
@@ -234,7 +274,7 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
               ],
             ),
           );
-        } else if (state is VisitRequestError) {
+        } else if (state is VisitRequestError && _catalogosListos) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.mensaje),
@@ -259,276 +299,321 @@ class _VisitRequestScreenState extends State<VisitRequestScreen> {
             onPressed: () => Navigator.pop(context),
           ),
         ),
-        body: BlocBuilder<VisitRequestBloc, VisitRequestState>(
-          builder: (context, state) {
-            if (state is VisitRequestLoading) {
-              return const LoadingWidget(mensaje: 'Enviando solicitud...');
-            }
+        body: SafeScaffoldBody(
+          child: BlocBuilder<VisitRequestBloc, VisitRequestState>(
+            builder: (context, state) {
+              if (!_catalogosListos) {
+                if (state is VisitRequestError) {
+                  return ErrorMessageWidget(
+                    mensaje: state.mensaje,
+                    onReintentar: _reintentarCatalogos,
+                  );
+                }
 
-            return Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.paddingPantalla),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      value: _tipoVisita,
-                      decoration: const InputDecoration(
-                        labelText: 'Tipo de visita',
-                        prefixIcon: Icon(Icons.category_outlined),
+                return const LoadingWidget(
+                  mensaje: 'Cargando edificios...',
+                );
+              }
+
+              if (state is VisitRequestLoading) {
+                return const LoadingWidget(mensaje: 'Enviando solicitud...');
+              }
+
+              return Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppSpacing.paddingPantalla),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_nombreEscuela.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: AppColors.headingSky.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMedium,
+                            ),
+                            border: Border.all(
+                              color: AppColors.headingSky.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.school_outlined,
+                                color: AppColors.headingSky,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  _nombreEscuela,
+                                  style: const TextStyle(
+                                    color: AppColors.deepNavy,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                      ],
+                      DropdownButtonFormField<String>(
+                        value: _tipoVisita,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Tipo de visita',
+                          prefixIcon: Icon(Icons.category_outlined),
+                        ),
+                        items: _tiposVisita
+                            .map(
+                              (tipo) => DropdownMenuItem(
+                                value: tipo.nombre,
+                                child: Text(
+                                  tipo.nombre,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() => _tipoVisita = value ?? 'Personal');
+                        },
                       ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'Proveedor',
-                          child: Text('Proveedor'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Institucional / Negocios',
-                          child: Text('Institucional / Negocios'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Personal',
-                          child: Text('Personal'),
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          Switch(
+                            value: _esGrupal,
+                            activeColor: AppColors.primaryCoral,
+                            onChanged: (value) {
+                              setState(() {
+                                _esGrupal = value;
+
+                                if (value && _visitantesGrupales.isEmpty) {
+                                  _agregarVisitante();
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Text(
+                            AppStrings.labelVisitaGrupal,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      if (!_esGrupal) ...[
+                        VisitanteFormWidget(
+                          indice: 0,
+                          nombreController: _nombreController,
+                          apellidosController: _apellidosController,
+                          correoController: _correoController,
+                          mostrarEliminar: false,
                         ),
                       ],
-                      onChanged: (value) {
-                        setState(() => _tipoVisita = value ?? 'Personal');
-                      },
-                    ),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    Row(
-                      children: [
-                        Switch(
-                          value: _esGrupal,
-                          activeColor: AppColors.primaryCoral,
-                          onChanged: (value) {
-                            setState(() {
-                              _esGrupal = value;
-
-                              if (value && _visitantesGrupales.isEmpty) {
-                                _agregarVisitante();
-                              }
-                            });
-                          },
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
+                      if (_esGrupal) ...[
                         Text(
-                          AppStrings.labelVisitaGrupal,
+                          'Visitantes del grupo',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
+                        const SizedBox(height: AppSpacing.sm),
+                        ..._visitantesGrupales.asMap().entries.map((entry) {
+                          return VisitanteFormWidget(
+                            indice: entry.key,
+                            nombreController: entry.value['nombre']!,
+                            apellidosController: entry.value['apellidos']!,
+                            correoController: entry.value['correo']!,
+                            onEliminar: () => _eliminarVisitante(entry.key),
+                          );
+                        }),
+                        TextButton.icon(
+                          onPressed: _agregarVisitante,
+                          icon: const Icon(
+                            Icons.add_circle_outline_rounded,
+                            color: AppColors.primaryCoral,
+                          ),
+                          label: const Text(
+                            AppStrings.botonAgregarVisitante,
+                            style: TextStyle(color: AppColors.primaryCoral),
+                          ),
+                        ),
                       ],
-                    ),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    if (!_esGrupal) ...[
-                      VisitanteFormWidget(
-                        indice: 0,
-                        nombreController: _nombreController,
-                        apellidosController: _apellidosController,
-                        correoController: _correoController,
-                        mostrarEliminar: false,
+                      const SizedBox(height: AppSpacing.md),
+                      DropdownButtonFormField<String>(
+                        value: _edificioSeleccionado.isEmpty
+                            ? null
+                            : _edificioSeleccionado,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: AppStrings.labelLugarDestino,
+                          prefixIcon: Icon(Icons.apartment_outlined),
+                        ),
+                        hint: const Text('Seleccione el edificio'),
+                        items: _edificios
+                            .map(
+                              (edificio) => DropdownMenuItem(
+                                value: edificio.nombre,
+                                child: Text(
+                                  edificio.nombre,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() => _edificioSeleccionado = value ?? '');
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return AppStrings.errorEdificioDestino;
+                          }
+                          return null;
+                        },
                       ),
-                    ],
-
-                    if (_esGrupal) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _seleccionarFecha,
+                              icon: const Icon(Icons.calendar_today_outlined),
+                              label: Text(
+                                _fechaVisita == null
+                                    ? AppStrings.labelFecha
+                                    : '${_fechaVisita!.day}/${_fechaVisita!.month}/${_fechaVisita!.year}',
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: AppSpacing.md,
+                                ),
+                                foregroundColor: AppColors.headingDark,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _seleccionarHora,
+                              icon: const Icon(Icons.access_time_rounded),
+                              label: Text(
+                                _horaVisita == null
+                                    ? AppStrings.labelHora
+                                    : _horaVisita!.format(context),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: AppSpacing.md,
+                                ),
+                                foregroundColor: AppColors.headingDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      TextFormField(
+                        controller: _motivoController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: AppStrings.labelMotivo,
+                          prefixIcon: Icon(Icons.notes_rounded),
+                          alignLabelWithHint: true,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Ingrese el motivo de la visita';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
                       Text(
-                        'Visitantes del grupo',
+                        AppStrings.labelToleranciaLlegada,
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      ..._visitantesGrupales.asMap().entries.map((entry) {
-                        return VisitanteFormWidget(
-                          indice: entry.key,
-                          nombreController: entry.value['nombre']!,
-                          apellidosController: entry.value['apellidos']!,
-                          correoController: entry.value['correo']!,
-                          onEliminar: () => _eliminarVisitante(entry.key),
-                        );
-                      }),
-                      TextButton.icon(
-                        onPressed: _agregarVisitante,
-                        icon: const Icon(
-                          Icons.add_circle_outline_rounded,
-                          color: AppColors.primaryCoral,
-                        ),
-                        label: const Text(
-                          AppStrings.botonAgregarVisitante,
-                          style: TextStyle(color: AppColors.primaryCoral),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  AppStrings.labelToleranciaAntes,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.neutralGrey,
+                                  ),
+                                ),
+                                DropdownButtonFormField<int>(
+                                  value: _toleranciaAntes,
+                                  isExpanded: true,
+                                  items: _tolerancias
+                                      .map(
+                                        (t) => DropdownMenuItem(
+                                          value: t,
+                                          child: Text('$t min'),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (value) {
+                                    setState(
+                                      () => _toleranciaAntes = value ?? 15,
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  AppStrings.labelToleranciaDespues,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.neutralGrey,
+                                  ),
+                                ),
+                                DropdownButtonFormField<int>(
+                                  value: _toleranciaDespues,
+                                  isExpanded: true,
+                                  items: _tolerancias
+                                      .map(
+                                        (t) => DropdownMenuItem(
+                                          value: t,
+                                          child: Text('$t min'),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (value) {
+                                    setState(
+                                      () => _toleranciaDespues = value ?? 15,
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      PrimaryButtonWidget(
+                        texto: AppStrings.botonEnviarSolicitud,
+                        onPressed: _onEnviarSolicitud,
                       ),
                     ],
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    TextFormField(
-                      controller: _lugarController,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.labelLugarDestino,
-                        prefixIcon: Icon(Icons.location_on_outlined),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Ingrese el lugar destino';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _seleccionarFecha,
-                            icon: const Icon(Icons.calendar_today_outlined),
-                            label: Text(
-                              _fechaVisita == null
-                                  ? AppStrings.labelFecha
-                                  : '${_fechaVisita!.day}/${_fechaVisita!.month}/${_fechaVisita!.year}',
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.md,
-                              ),
-                              foregroundColor: AppColors.headingDark,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _seleccionarHora,
-                            icon: const Icon(Icons.access_time_rounded),
-                            label: Text(
-                              _horaVisita == null
-                                  ? AppStrings.labelHora
-                                  : _horaVisita!.format(context),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.md,
-                              ),
-                              foregroundColor: AppColors.headingDark,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    TextFormField(
-                      controller: _motivoController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: AppStrings.labelMotivo,
-                        prefixIcon: Icon(Icons.notes_rounded),
-                        alignLabelWithHint: true,
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Ingrese el motivo de la visita';
-                        }
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: AppSpacing.md),
-
-                    Text(
-                      AppStrings.labelToleranciaLlegada,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-
-                    const SizedBox(height: AppSpacing.sm),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                AppStrings.labelToleranciaAntes,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.neutralGrey,
-                                ),
-                              ),
-                              DropdownButtonFormField<int>(
-                                value: _toleranciaAntes,
-                                items: _tolerancias
-                                    .map(
-                                      (t) => DropdownMenuItem(
-                                    value: t,
-                                    child: Text('$t min'),
-                                  ),
-                                )
-                                    .toList(),
-                                onChanged: (value) {
-                                  setState(
-                                        () => _toleranciaAntes = value ?? 15,
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                AppStrings.labelToleranciaDespues,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.neutralGrey,
-                                ),
-                              ),
-                              DropdownButtonFormField<int>(
-                                value: _toleranciaDespues,
-                                items: _tolerancias
-                                    .map(
-                                      (t) => DropdownMenuItem(
-                                    value: t,
-                                    child: Text('$t min'),
-                                  ),
-                                )
-                                    .toList(),
-                                onChanged: (value) {
-                                  setState(
-                                        () => _toleranciaDespues = value ?? 15,
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: AppSpacing.xl),
-
-                    BlocBuilder<VisitRequestBloc, VisitRequestState>(
-                      builder: (context, state) {
-                        return PrimaryButtonWidget(
-                          texto: AppStrings.botonEnviarSolicitud,
-                          cargando: state is VisitRequestLoading,
-                          onPressed: _onEnviarSolicitud,
-                        );
-                      },
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );

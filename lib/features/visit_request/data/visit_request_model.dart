@@ -216,8 +216,19 @@ class CatalogoModel {
     return CatalogoModel(
       id: json['id'] as int? ??
           json['id_tipo_solicitud'] as int? ??
+          int.tryParse(json['id']?.toString() ?? '') ??
           0,
       nombre: json['nombre']?.toString() ?? '',
     );
   }
+}
+
+class EdificiosCatalogoResult {
+  final List<CatalogoModel> items;
+  final String nombreEscuela;
+
+  const EdificiosCatalogoResult({
+    required this.items,
+    required this.nombreEscuela,
+  });
 }

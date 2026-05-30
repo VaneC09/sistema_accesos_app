@@ -118,6 +118,19 @@ class VisitRequestRepository {
     }
   }
 
+  Future<EdificiosCatalogoResult> obtenerEdificios({int idEscuela = 1}) async {
+    try {
+      return await _datasource.obtenerEdificios(idEscuela: idEscuela);
+    } on AppException {
+      rethrow;
+    } catch (e) {
+      AppLogger.error(_modulo, 'Error al obtener edificios: $e');
+      throw const ServerException(
+        mensaje: 'No fue posible cargar los edificios. Intente nuevamente',
+      );
+    }
+  }
+
   // Enviar QR
   Future<String> enviarQr(int idSolicitud) async {
     try {
